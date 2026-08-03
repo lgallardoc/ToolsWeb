@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Toolsweb WebExtensions recorder (scaffold)",
   "scripts": {
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:store": "tsx scripts/assert-session-store.mts"
   },
   "dependencies": {
     "@toolsweb/shared": "*",

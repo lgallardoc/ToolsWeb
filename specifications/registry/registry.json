@@ -66,6 +66,11 @@
       "id": "UC-0004",
       "path": "specifications/uc/UC-0004-avatar-script-feature-flag.md",
       "status": "approved"
+    },
+    {
+      "id": "UC-0005",
+      "path": "specifications/uc/UC-0005-extension-event-recorder.md",
+      "status": "approved"
     }
   ]
 }

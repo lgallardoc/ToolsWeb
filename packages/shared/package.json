@@ -18,7 +18,8 @@
     "test:contracts": "tsx scripts/assert-contracts.mts",
     "test:privacy": "tsx scripts/assert-privacy.mts",
     "test:narrative": "tsx scripts/assert-narrative.mts",
-    "test": "npm run test:contracts && npm run test:privacy && npm run test:narrative"
+    "test:extension-messages": "tsx scripts/assert-extension-messages.mts",
+    "test": "npm run test:contracts && npm run test:privacy && npm run test:narrative && npm run test:extension-messages"
   },
   "dependencies": {
     "zod": "^3.24.2"
