@@ -4,7 +4,8 @@
   "private": true,
   "description": "Capture web navigation actions and export HTML5 tutorials / PDF guides",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "npm run dev -w @toolsweb/backend",

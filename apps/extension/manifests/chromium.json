@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Toolsweb Recorder",
+  "version": "0.1.0",
+  "description": "Event-first tutorial recorder (scaffold — ADR-0004/0006).",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Toolsweb",
+    "default_popup": "src/popup/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ]
+}

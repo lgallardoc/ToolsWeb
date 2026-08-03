@@ -38,6 +38,11 @@
       "status": "accepted"
     },
     {
+      "id": "ADR-0006",
+      "path": "specifications/adr/ADR-0006-extension-studio-scaffold.md",
+      "status": "accepted"
+    },
+    {
       "id": "ASSUMP-0001",
       "path": "specifications/assumptions/ASSUMP-0001-single-active-session.md",
       "status": "accepted"
