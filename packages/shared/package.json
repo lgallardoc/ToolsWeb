@@ -14,12 +14,14 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dev": "tsc -p tsconfig.json --watch"
+    "dev": "tsc -p tsconfig.json --watch",
+    "test:contracts": "tsx scripts/assert-contracts.mts"
   },
   "dependencies": {
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }
 }

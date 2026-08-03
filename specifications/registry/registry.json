@@ -33,6 +33,11 @@
       "status": "accepted"
     },
     {
+      "id": "ADR-0005",
+      "path": "specifications/adr/ADR-0005-dual-contract-model.md",
+      "status": "accepted"
+    },
+    {
       "id": "ASSUMP-0001",
       "path": "specifications/assumptions/ASSUMP-0001-single-active-session.md",
       "status": "accepted"
