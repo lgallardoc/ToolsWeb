@@ -6,7 +6,8 @@
 2. **ADR-0004** — pivot a WebExtensions / event-first (Prompt Maestro).
 3. Contratos Zod enriquecidos alineados al modelo del Prompt Maestro (`TutorialAction`, viewport, locators, `sensitive`) — **ADR-0005** (dual con `CaptureStep`).
 4. PrivacyFilter ampliado + `docs/PRIVACY.md` — **hecho** (Prompt Maestro §8).
-5. Narración determinista + normalización/agrupación (sin IA).
+5. Narración determinista + normalización/agrupación (sin IA) — **hecho** (§16–17); borrador incluido en `avatarPrompt`.
+6. Scaffold WebExtensions / Studio (ADR-0004).
 
 ## Migración WebExtensions (destino)
 

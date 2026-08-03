@@ -111,6 +111,8 @@ export const TutorialActionSchema = z.object({
   metadata: z.object({
     browser: z.string().optional(),
     frameId: z.string().optional(),
+    /** Set when a click was collapsed with a following navigation. */
+    navigatedTo: z.string().url().optional(),
     source: TutorialActionSourceSchema,
   }),
   /** Human narrative line (deterministic or AI). Optional during capture. */

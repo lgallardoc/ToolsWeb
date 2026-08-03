@@ -1,4 +1,5 @@
 import type { CaptureStep, TutorialSession } from '@toolsweb/shared';
+import { narrationFromCaptureSession } from '@toolsweb/shared';
 
 const PROMPT_INSTRUCTIONS = `Eres un experto redactor de guiones instruccionales para avatares y locuciones en video tutoriales (HeyGen, Synthesia, ElevenLabs).
 
@@ -12,7 +13,8 @@ REGLAS DE PROCESAMIENTO:
 4. REDACTA en español, segunda persona del singular ("haz clic", "ingresa", "selecciona"), tono profesional, claro y directo.
 5. MANTÉN continuidad narrativa con conectores temporales ("Primero...", "Luego...", "A continuación...", "Una vez completado..."), alineados al orden y a los gaps reales.
 6. Si faltan metadatos claros, deduce la intención por el contexto del formulario, encabezado o título del tutorial.
-7. Devuelve ÚNICAMENTE el texto final del guión narrativo, listo para ser leído por un locutor o avatar (sin etiquetas de código, sin JSON, sin metadatos).`;
+7. Toma el BORRADOR DETERMINISTA como base: mejora fluidez y naturalidad, sin inventar pasos que no estén en el registro.
+8. Devuelve ÚNICAMENTE el texto final del guión narrativo, listo para ser leído por un locutor o avatar (sin etiquetas de código, sin JSON, sin metadatos).`;
 
 function stepContext(
   step: CaptureStep,
@@ -43,7 +45,7 @@ function stepContext(
 
 /**
  * Builds a copy-paste prompt from captured steps (UC-0004).
- * No network / no LLM SDKs — the author runs this in any external AI.
+ * Includes a deterministic Spanish draft (Prompt Maestro §16–17) for the external AI to refine.
  */
 export class AvatarPromptService {
   buildPrompt(session: TutorialSession): string | undefined {
@@ -70,6 +72,10 @@ export class AvatarPromptService {
         ? Math.max(0, Math.round(lastAt - originMs))
         : 0;
 
+    const draft = narrationFromCaptureSession(session, {
+      includeNavigate: interactive.length === 0,
+    });
+
     const payload = {
       title: session.title,
       timeline: {
@@ -84,6 +90,9 @@ export class AvatarPromptService {
       PROMPT_INSTRUCTIONS,
       '',
       `Título del tutorial: ${session.title}`,
+      '',
+      'BORRADOR DETERMINISTA (base; mejóralo sin inventar pasos):',
+      draft.fullSpokenText,
       '',
       'REGISTRO DE INTERACCIONES CON LÍNEA DE TIEMPO (JSON):',
       JSON.stringify(payload, null, 2),

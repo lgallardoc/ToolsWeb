@@ -14,7 +14,7 @@ actors: [Author]
 Al detener una sesión con avatar/metadata activos:
 
 1. Toolsweb **no** llama a OpenAI / Gemini / Anthropic.
-2. Genera un **prompt** listo para pegar en cualquier chat AI, a partir de los pasos, metadatos semánticos y **línea de tiempo**.
+2. Genera un **prompt** listo para pegar en cualquier chat AI, a partir de los pasos, metadatos semánticos, **línea de tiempo** y un **borrador determinista** en español (sin LLM).
 3. El autor pega la respuesta de la AI en la UI; Toolsweb la guarda como `fullScript` (y opcionalmente `steps[].avatarScript` si viene JSON).
 
 ## Línea de tiempo
@@ -23,6 +23,12 @@ Al detener una sesión con avatar/metadata activos:
 2. `CaptureStep.timestamp` = ese instante (fallback: reloj Node si falta).
 3. El prompt incluye por paso: `timestamp`, `elapsedMs` (desde el 1.ᵉʳ paso del registro usado) y `gapMs` (delta vs. anterior), más `timeline.durationMs`.
 4. Las instrucciones del prompt piden adaptar el ritmo narrativo a esos gaps.
+
+## Narración determinista
+
+1. `normalizeActions` (dedupe, agrupa inputs, colapsa click+navigate).
+2. `generateNarrativeStep` / `generateDeterministicNarration` en español, 2.ª persona, sin jerga DOM.
+3. El prompt embede el borrador bajo “BORRADOR DETERMINISTA” para que la AI lo refine.
 
 ## Flujo principal
 

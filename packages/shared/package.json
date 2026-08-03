@@ -17,7 +17,8 @@
     "dev": "tsc -p tsconfig.json --watch",
     "test:contracts": "tsx scripts/assert-contracts.mts",
     "test:privacy": "tsx scripts/assert-privacy.mts",
-    "test": "npm run test:contracts && npm run test:privacy"
+    "test:narrative": "tsx scripts/assert-narrative.mts",
+    "test": "npm run test:contracts && npm run test:privacy && npm run test:narrative"
   },
   "dependencies": {
     "zod": "^3.24.2"
