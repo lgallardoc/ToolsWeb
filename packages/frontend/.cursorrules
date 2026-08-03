@@ -1,0 +1,8 @@
+# @toolsweb/frontend — reglas locales
+
+Leer primero: raíz `CONTRIBUTING.md`, `.cursor/rules/00-project-constitution.mdc`, `ARCHITECTURE.md`.
+
+- React 18 + Vite + Tailwind únicamente (sin UI kits nuevos sin ADR).
+- Consumir API HTTP (`/api/*`); no importar Playwright ni services backend.
+- Tipos de sesión/steps desde `@toolsweb/shared`.
+- Cambios quirúrgicos; sin refactors no pedidos.

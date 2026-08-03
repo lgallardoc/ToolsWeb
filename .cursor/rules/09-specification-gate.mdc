@@ -1,0 +1,17 @@
+---
+description: Spec-first gate — contrast, approve, then code (token-safe)
+alwaysApply: true
+---
+
+# Specification Gate (Toolsweb)
+
+Antes de implementar o cambiar comportamiento:
+
+1. **Contrastar** con `ARCHITECTURE.md` y artefactos en `specifications/` (UC/TS/ADR/TW).
+2. **Presentar gap** breve al usuario (qué falta / qué ADR o UC cubriría).
+3. **Esperar aprobación explícita** antes de código o specs nuevas no triviales.
+4. Tras aprobación: actualizar specs → código → smoke/typecheck → registro.
+5. No expandir el alcance “de pasada”; un `id` por entrega cuando sea feature.
+
+Excepción: typos, docs no normativas, typecheck/fix menores localizados — sin gate.
+Features de producto (nuevos actions, export modes, multi-sesión, auth) — **con gate**.

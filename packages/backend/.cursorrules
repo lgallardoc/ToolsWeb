@@ -1,0 +1,9 @@
+# @toolsweb/backend — reglas locales
+
+Leer primero: raíz `CONTRIBUTING.md`, `.cursor/rules/00-project-constitution.mdc`, `ARCHITECTURE.md`.
+
+- Capas: `server/routes` → `services` → Playwright/fs.
+- Contratos: importar Zod/types desde `@toolsweb/shared` (build shared si cambian).
+- `CAPTURE_INIT_SCRIPT` = JS plano (ADR-0002).
+- No versionar `captures/`.
+- Cambios quirúrgicos; una sesión activa (ASSUMP-0001).

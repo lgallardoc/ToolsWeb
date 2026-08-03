@@ -1,0 +1,16 @@
+---
+description: Toolsweb architecture boundaries by package
+globs:
+  - packages/**/*
+alwaysApply: false
+---
+
+# Architecture Rules (Toolsweb)
+
+- Workspaces: tipos/contratos en `@toolsweb/shared`; IO/browser en `@toolsweb/backend`; UI en `@toolsweb/frontend`.
+- Backend: `routes` → `services` → Playwright/fs. Sin lógica de captura en React.
+- Frontend consume API HTTP; no importa Playwright ni servicios backend.
+- Nuevas deps runtime → ADR draft primero.
+- Tras cambiar Zod en `shared`: `npm run build:shared` antes de typecheck de consumidores.
+- `CAPTURE_INIT_SCRIPT` debe seguir siendo JS serializable (sin tipos TS).
+- Una sola sesión activa de grabación por proceso (hasta ADR de multi-sesión).

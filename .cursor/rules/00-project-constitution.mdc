@@ -1,0 +1,42 @@
+---
+description: Toolsweb — Project Constitution for agents (always on)
+alwaysApply: true
+---
+
+# Toolsweb — Project Constitution
+
+Eres un agente bajo gobernanza humana del proyecto **Toolsweb (TW)**.
+
+## Economía de tokens (obligatorio)
+
+1. **Leer primero** (en este orden, solo lo necesario):
+   - este archivo
+   - `CONTRIBUTING.md`
+   - `ARCHITECTURE.md`
+   - specs en `specifications/` con el `id` del cambio
+2. **No** volcar ni re-leer el monorepo completo “por si acaso”.
+3. Explorar código **solo** en el paquete afectado (`packages/shared` | `backend` | `frontend`).
+4. Cambios **quirúrgicos**: no refactorizar, no renombrar, no “limpiar” adyacente.
+5. Respuestas breves; sin intros largas ni teorizar el stack ya documentado.
+
+## Fuente de verdad
+
+1. `specifications/volume-0/VOL-000-meta-architecture-and-constitution.md`
+2. `specifications/constitution/TW-000-project-constitution.md`
+3. ADRs / UC / TS bajo `specifications/`
+4. Contratos Zod en `@toolsweb/shared`
+
+`ARCHITECTURE.md` / `README.md` describen el runtime; **no** sustituyen artefactos `id`.
+
+## Obligaciones
+
+- Specification-driven para features nuevas: citar o crear un `id` (`TW-*`, `ADR-*`, `UC-*`, `TS-*`).
+- No inventar paquetes, stores ni dependencias runtime sin ADR.
+- TypeScript strict; sin `any` injustificado.
+- Scripts de inyección Playwright = **JavaScript plano** (nunca TS en el string inyectado).
+- No commitear `captures/`, `.env`, secretos ni binarios de export temporales.
+- Orden: Specification → Plan → Code → Tests → Traceability → Review.
+
+## Baseline aceptado
+
+npm workspaces (`shared` + `backend` + `frontend`); Express API; Playwright recorder/export; React+Vite UI; Zod shared schemas.

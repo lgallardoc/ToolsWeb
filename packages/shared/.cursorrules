@@ -1,0 +1,7 @@
+# @toolsweb/shared — reglas locales
+
+Leer primero: raíz `CONTRIBUTING.md` y constitución Cursor.
+
+- Única fuente de DTOs Zod del monorepo.
+- Tras editar: `npm run build:shared` desde la raíz.
+- Evitar lógica de runtime (browser/fs); solo tipos, schemas y helpers puros.

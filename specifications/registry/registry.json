@@ -1,0 +1,56 @@
+{
+  "project": "Toolsweb",
+  "updatedAt": "2026-08-03",
+  "artifacts": [
+    {
+      "id": "TW-VOL-000",
+      "path": "specifications/volume-0/VOL-000-meta-architecture-and-constitution.md",
+      "status": "approved"
+    },
+    {
+      "id": "TW-000",
+      "path": "specifications/constitution/TW-000-project-constitution.md",
+      "status": "approved"
+    },
+    {
+      "id": "ADR-0001",
+      "path": "specifications/adr/ADR-0001-npm-workspaces.md",
+      "status": "accepted"
+    },
+    {
+      "id": "ADR-0002",
+      "path": "specifications/adr/ADR-0002-playwright-plain-js-injection.md",
+      "status": "accepted"
+    },
+    {
+      "id": "ADR-0003",
+      "path": "specifications/adr/ADR-0003-llm-avatar-script-adapter.md",
+      "status": "accepted"
+    },
+    {
+      "id": "ASSUMP-0001",
+      "path": "specifications/assumptions/ASSUMP-0001-single-active-session.md",
+      "status": "accepted"
+    },
+    {
+      "id": "UC-0001",
+      "path": "specifications/uc/UC-0001-step-preview.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0002",
+      "path": "specifications/uc/UC-0002-capture-quality-and-in-browser-stop.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0003",
+      "path": "specifications/uc/UC-0003-element-metadata-capture.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0004",
+      "path": "specifications/uc/UC-0004-avatar-script-feature-flag.md",
+      "status": "approved"
+    }
+  ]
+}
