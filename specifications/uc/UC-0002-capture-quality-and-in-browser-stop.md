@@ -26,8 +26,8 @@ actors: [Author]
    - cada **cambio** de `<select>` / option / menuitem (action `select`).
 5. Blank-skip (≥90% uniforme) **solo** para `navigate`. `click` / `input` / `select` se conservan aunque el PNG sea claro/casi vacío.
 6. El anillo/cursor de highlight lo limpia **solo Node tras el screenshot**. El `emit` del browser no hace `clearHighlight` (evita carrera que borraba el foco en click/select de listbox).
-7. Binding vía `context.exposeBinding` (sobrevive navegaciones). Gestos no-freeze se encolan en Node **sin bloquear** el browser (evita perder clicks/teclas mientras la cola de PNG drena).
-8. `pointerdown` captura opciones de listbox antes de que el DOM las desmonte; `click` congela navegaciones.
+7. Binding vía `context.exposeBinding` + **cola in-page** (`__toolswebQueue`) drenada por Node cada ~120ms (los gestos no se pierden si el binding falla).
+8. `pointerdown` captura opciones de listbox antes de que el DOM las desmonte; `click` congela navegaciones. Ack de freeze vía `__toolswebFreezeAck`.
 9. Autor pulsa **Stop session** en la UI → sesión se cierra y se guarda en bitácora.
 
 ## Reglas
@@ -37,3 +37,4 @@ actors: [Author]
 - `freshLogin` / perfil persistente no cambian por este UC.
 - `click` / `select` con `clickPoint` usan anillo rojo + cursor; focus de campo usa anillo verde.
 - Si falta `boundingBox`, se sintetiza un anillo 56×56 alrededor de `clickPoint`.
+- Bridge Playwright temporal (ADR-0004); destino WebExtensions.

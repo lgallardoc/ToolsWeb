@@ -56,6 +56,8 @@ type BrowserCapturePayload = {
   freezeNavigation?: boolean;
   /** Exact gesture time from the browser (ISO-8601). Prefer over Node wall clock. */
   capturedAt?: string;
+  /** Correlate freeze gesture with Node ack (__toolswebFreezeAck). */
+  freezeId?: string;
   /** UC-0003 — from MetadataExtractor.extractElementMetadata in the page. */
   ariaLabel?: string;
   closestHeader?: string;
@@ -97,6 +99,8 @@ type ActiveRuntime = {
   navigationReady: boolean;
   /** UC-0004 — per-session flag (env default or StartSessionRequest override). */
   enableAvatarScript: boolean;
+  /** Poll in-page __toolswebQueue when binding is flaky. */
+  drainTimer?: ReturnType<typeof setInterval> | undefined;
 };
 
 async function openCaptureContext(input: {
@@ -183,6 +187,8 @@ export class RecorderService {
   private onStoppedFromBrowser: ((session: TutorialSession) => Promise<void>) | null = null;
   /** Survives after stop so finalize/avatar can read the session flag. */
   private avatarFlags = new Map<string, boolean>();
+  /** Deduplicate binding + queue deliveries of the same gesture. */
+  private recentGestureKeys = new Map<string, number>();
 
   setOnStoppedFromBrowser(handler: (session: TutorialSession) => Promise<void>): void {
     this.onStoppedFromBrowser = handler;
@@ -320,8 +326,38 @@ export class RecorderService {
 
     await this.ensureCaptureInstalled(page);
     this.runtime.navigationReady = true;
+    this.startQueueDrain(page);
 
     return session;
+  }
+
+  /** Poll in-page queue so gestures survive when exposeBinding is flaky. */
+  private startQueueDrain(page: Page): void {
+    const runtime = this.runtime;
+    if (!runtime) return;
+    if (runtime.drainTimer) clearInterval(runtime.drainTimer);
+    runtime.drainTimer = setInterval(() => {
+      void this.drainCaptureQueue(page);
+    }, 120);
+  }
+
+  private async drainCaptureQueue(page: Page): Promise<void> {
+    const runtime = this.runtime;
+    if (!runtime || !this.activeSessionId || page.isClosed()) return;
+    if (runtime.sessionId !== this.activeSessionId) return;
+    try {
+      const batch = await page.evaluate(() => {
+        const w = window as Window & { __toolswebQueue?: unknown[] };
+        const q = Array.isArray(w.__toolswebQueue) ? w.__toolswebQueue.splice(0) : [];
+        return q as BrowserCapturePayload[];
+      });
+      for (const payload of batch) {
+        if (!payload || typeof payload !== 'object') continue;
+        void this.enqueue(() => this.handleBrowserEvent(payload));
+      }
+    } catch {
+      /* page mid-navigation */
+    }
   }
 
   /** Inject stealth + capture listeners into the live page document. */
@@ -330,20 +366,37 @@ export class RecorderService {
     if (!runtime || page.isClosed()) return;
     try {
       await page.evaluate(STEALTH_INIT);
+      await page.evaluate(() => {
+        const w = window as Window & {
+          __toolswebForceReinstall?: boolean;
+          __toolswebInstalled?: boolean;
+          __toolswebListenersOk?: boolean;
+        };
+        w.__toolswebForceReinstall = true;
+        w.__toolswebInstalled = false;
+        w.__toolswebListenersOk = false;
+      });
       await page.evaluate(
         buildCaptureInitScript({
           enableAvatarScript: runtime.enableAvatarScript,
         })
       );
       const ok = await page.evaluate(() => {
-        const w = window as Window & { __toolswebCapture?: unknown; __toolswebInstalled?: boolean };
+        const w = window as Window & {
+          __toolswebCapture?: unknown;
+          __toolswebInstalled?: boolean;
+          __toolswebListenersOk?: boolean;
+          __toolswebQueue?: unknown[];
+        };
         return {
           installed: w.__toolswebInstalled === true,
+          listenersOk: w.__toolswebListenersOk === true,
           hasBinding: typeof w.__toolswebCapture === 'function',
+          queueReady: Array.isArray(w.__toolswebQueue),
         };
       });
-      if (!ok.hasBinding) {
-        console.warn('[RecorderService] __toolswebCapture binding missing after inject');
+      if (!ok.listenersOk || !ok.queueReady) {
+        console.warn('[RecorderService] capture inject incomplete', ok);
       }
     } catch (err) {
       console.warn('[RecorderService] ensureCaptureInstalled failed', err);
@@ -407,9 +460,23 @@ export class RecorderService {
 
   private async teardownRuntime(): Promise<void> {
     const runtime = this.runtime;
+    if (!runtime) {
+      this.activeSessionId = null;
+      return;
+    }
+    if (runtime.drainTimer) {
+      clearInterval(runtime.drainTimer);
+      runtime.drainTimer = undefined;
+    }
+    try {
+      if (!runtime.page.isClosed()) {
+        await this.drainCaptureQueue(runtime.page);
+      }
+    } catch {
+      /* ignore */
+    }
     this.activeSessionId = null;
     this.runtime = null;
-    if (!runtime) return;
     try {
       await runtime.context.close();
     } catch {
@@ -424,6 +491,31 @@ export class RecorderService {
     }
   }
 
+  private gestureDedupeKey(payload: BrowserCapturePayload): string {
+    return [
+      payload.capturedAt ?? '',
+      payload.action,
+      payload.selector ?? '',
+      payload.description ?? '',
+      payload.freezeId ?? '',
+    ].join('|');
+  }
+
+  private shouldSkipDuplicateGesture(payload: BrowserCapturePayload): boolean {
+    const key = this.gestureDedupeKey(payload);
+    const now = Date.now();
+    const prev = this.recentGestureKeys.get(key);
+    if (prev !== undefined && now - prev < 2500) return true;
+    this.recentGestureKeys.set(key, now);
+    // Opportunistic prune
+    if (this.recentGestureKeys.size > 200) {
+      for (const [k, t] of this.recentGestureKeys) {
+        if (now - t > 5000) this.recentGestureKeys.delete(k);
+      }
+    }
+    return false;
+  }
+
   private enqueue(task: () => Promise<void>): Promise<void> {
     this.queue = this.queue.then(task).catch((err) => {
       console.error('[RecorderService]', err);
@@ -434,6 +526,7 @@ export class RecorderService {
   private async handleBrowserEvent(payload: BrowserCapturePayload): Promise<void> {
     const runtime = this.runtime;
     if (!runtime || !this.activeSessionId) return;
+    if (this.shouldSkipDuplicateGesture(payload)) return;
 
     const target: CaptureTarget = {
       tagName: payload.tagName || 'unknown',
@@ -458,6 +551,18 @@ export class RecorderService {
         ...(payload.capturedAt ? { capturedAt: payload.capturedAt } : {}),
       });
     } finally {
+      if (payload.freezeId) {
+        try {
+          if (!runtime.page.isClosed()) {
+            await runtime.page.evaluate((id) => {
+              const w = window as Window & { __toolswebFreezeAck?: string };
+              w.__toolswebFreezeAck = id;
+            }, payload.freezeId);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       if (freezeNav) {
         // Allow the replayed click to create a navigate step afterwards.
         runtime.suppressNavigationSteps = false;

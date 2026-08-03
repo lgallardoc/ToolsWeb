@@ -28,6 +28,11 @@
       "status": "accepted"
     },
     {
+      "id": "ADR-0004",
+      "path": "specifications/adr/ADR-0004-webextensions-pivot.md",
+      "status": "accepted"
+    },
+    {
       "id": "ASSUMP-0001",
       "path": "specifications/assumptions/ASSUMP-0001-single-active-session.md",
       "status": "accepted"

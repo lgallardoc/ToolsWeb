@@ -11,9 +11,21 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
   return `
 (function () {
   var w = window;
-  if (w.__toolswebInstalled) return;
-  w.__toolswebInstalled = true;
+  // Reinstall when Node sets __toolswebForceReinstall (broken listeners / SPA).
+  if (w.__toolswebListenersOk && !w.__toolswebForceReinstall) return;
+  if (w.__toolswebAbort && typeof w.__toolswebAbort.abort === 'function') {
+    try { w.__toolswebAbort.abort(); } catch (e) { /* ignore */ }
+  }
+  w.__toolswebForceReinstall = false;
+  w.__toolswebListenersOk = false;
+  w.__toolswebInstalled = false;
   w.__toolswebEnableAvatarScript = ${enableFlag};
+  w.__toolswebQueue = Array.isArray(w.__toolswebQueue) ? w.__toolswebQueue : [];
+  w.__toolswebAbort =
+    typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var listenerOpts = w.__toolswebAbort
+    ? { capture: true, signal: w.__toolswebAbort.signal }
+    : true;
 
   var HIGHLIGHT_ID = '__toolsweb_highlight__';
   var CURSOR_ID = '__toolsweb_cursor__';
@@ -221,16 +233,35 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
    * Deliver to Node. Freeze awaits the screenshot; other actions return immediately
    * so rapid typing/clicks are not lost while the shot queue drains (UC-0002).
    */
+  /**
+   * Always enqueue in-page (survives binding failures on some hosts).
+   * Freeze waits for Node ack via __toolswebFreezeAck (UC-0002 / bridge Playwright).
+   */
+  function waitFreezeAck(freezeId, timeoutMs) {
+    return new Promise(function (resolve) {
+      var start = Date.now();
+      function tick() {
+        if (w.__toolswebFreezeAck === freezeId) {
+          resolve(undefined);
+          return;
+        }
+        if (Date.now() - start > timeoutMs) {
+          console.warn('[toolsweb] freeze ack timeout', freezeId);
+          resolve(undefined);
+          return;
+        }
+        setTimeout(tick, 40);
+      }
+      tick();
+    });
+  }
+
   function emit(payload) {
     // Stamp the gesture before any await — timeline source of truth for the prompt.
     if (!payload.capturedAt) {
       payload.capturedAt = new Date().toISOString();
     }
     ensureHighlightGeometry(payload);
-    if (typeof w.__toolswebCapture !== 'function') {
-      console.warn('[toolsweb] __toolswebCapture missing — dropped', payload.action, payload.description);
-      return Promise.resolve();
-    }
     if (payload.boundingBox) {
       showHighlight(
         payload.boundingBox,
@@ -238,14 +269,35 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
         highlightKind(payload)
       );
     }
+
+    w.__toolswebQueue = Array.isArray(w.__toolswebQueue) ? w.__toolswebQueue : [];
+    w.__toolswebQueue.push(payload);
+
     if (payload.freezeNavigation) {
-      return waitForPaint().then(function () {
+      var freezeId =
+        'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+      payload.freezeId = freezeId;
+      var bindingPromise = Promise.resolve();
+      if (typeof w.__toolswebCapture === 'function') {
+        bindingPromise = waitForPaint().then(function () {
+          return w.__toolswebCapture(payload);
+        });
+      }
+      return bindingPromise.then(
+        function () {
+          return waitFreezeAck(freezeId, 8000);
+        },
+        function () {
+          return waitFreezeAck(freezeId, 8000);
+        }
+      );
+    }
+
+    if (typeof w.__toolswebCapture === 'function') {
+      void waitForPaint().then(function () {
         return w.__toolswebCapture(payload);
       });
     }
-    void waitForPaint().then(function () {
-      return w.__toolswebCapture(payload);
-    });
     return Promise.resolve();
   }
 
@@ -555,7 +607,7 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
         scheduleOpenMenuCapture(target);
       }
     },
-    true
+    listenerOpts
   );
 
   document.addEventListener(
@@ -605,7 +657,7 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
         replayClick(freezeTarget);
       });
     },
-    true
+    listenerOpts
   );
 
   var inputTimer = null;
@@ -713,12 +765,16 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
       if (boundingBox) payload.boundingBox = boundingBox;
       void emit(payload);
     },
-    true
+    listenerOpts
   );
 
-  document.addEventListener('input', onFieldEvent, true);
-  document.addEventListener('change', onFieldEvent, true);
-  document.addEventListener('blur', onFieldEvent, true);
+  document.addEventListener('input', onFieldEvent, listenerOpts);
+  document.addEventListener('change', onFieldEvent, listenerOpts);
+  document.addEventListener('blur', onFieldEvent, listenerOpts);
+
+  // Mark installed only after listeners are attached (avoids half-broken sessions).
+  w.__toolswebInstalled = true;
+  w.__toolswebListenersOk = true;
 })();
 `;
 }
