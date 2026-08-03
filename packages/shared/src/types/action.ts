@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { filterFieldValue } from '../privacy.js';
 import type { CaptureStep } from './tutorial.js';
 
 /**
@@ -171,8 +172,7 @@ function mapCaptureAction(
 }
 
 /**
- * Best-effort bridge mapper (ADR-0005). Does not invent privacy classification
- * beyond password-like descriptions; callers may refine `sensitive`.
+ * Best-effort bridge mapper (ADR-0005) with PrivacyFilter (Prompt Maestro §8).
  */
 export function captureStepToTutorialAction(
   step: CaptureStep,
@@ -203,10 +203,18 @@ export function captureStepToTutorialAction(
     });
   }
 
-  const sensitive =
-    /password|contrase[nñ]a|secret|token|cvv|api[_-]?key/i.test(
-      `${step.description} ${step.target.selector} ${step.placeholder ?? ''}`
-    );
+  const rawValue = step.target.text ?? '';
+  const hint = {
+    selector: step.target.selector,
+    description: step.description,
+    ...(step.placeholder !== undefined ? { placeholder: step.placeholder } : {}),
+    ...(step.ariaLabel !== undefined ? { ariaLabel: step.ariaLabel } : {}),
+    ...(step.formContext !== undefined ? { label: step.formContext } : {}),
+    ...(/password/i.test(`${step.target.selector} ${step.description}`)
+      ? { inputType: 'password' }
+      : {}),
+  };
+  const filtered = filterFieldValue(rawValue, hint);
 
   return TutorialActionSchema.parse({
     id: step.id,
@@ -218,7 +226,7 @@ export function captureStepToTutorialAction(
     pageTitle: '',
     target: {
       tagName: step.target.tagName,
-      text: step.target.text,
+      text: filtered.value || step.target.text,
       ariaLabel: step.ariaLabel,
       placeholder: step.placeholder,
       closestHeader: step.closestHeader,
@@ -226,8 +234,8 @@ export function captureStepToTutorialAction(
       locatorCandidates,
       ...(boundingBox ? { boundingBox } : {}),
     },
-    value: step.target.text,
-    sensitive,
+    value: filtered.value || undefined,
+    sensitive: filtered.sensitive,
     viewport: options?.viewport ?? DEFAULT_VIEWPORT,
     metadata: {
       ...(options?.browser ? { browser: options.browser } : {}),

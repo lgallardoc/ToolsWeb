@@ -5,7 +5,7 @@
 1. **Estabilizar bridge Playwright** — clicks/input/select + highlight sincronizado (UC-0002).
 2. **ADR-0004** — pivot a WebExtensions / event-first (Prompt Maestro).
 3. Contratos Zod enriquecidos alineados al modelo del Prompt Maestro (`TutorialAction`, viewport, locators, `sensitive`) — **ADR-0005** (dual con `CaptureStep`).
-4. PrivacyFilter ampliado + `docs/PRIVACY.md`.
+4. PrivacyFilter ampliado + `docs/PRIVACY.md` — **hecho** (Prompt Maestro §8).
 5. Narración determinista + normalización/agrupación (sin IA).
 
 ## Migración WebExtensions (destino)

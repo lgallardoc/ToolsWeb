@@ -15,7 +15,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsc -p tsconfig.json --watch",
-    "test:contracts": "tsx scripts/assert-contracts.mts"
+    "test:contracts": "tsx scripts/assert-contracts.mts",
+    "test:privacy": "tsx scripts/assert-privacy.mts",
+    "test": "npm run test:contracts && npm run test:privacy"
   },
   "dependencies": {
     "zod": "^3.24.2"
