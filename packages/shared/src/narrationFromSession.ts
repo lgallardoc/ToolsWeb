@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { CaptureStep, TutorialSession } from './types/tutorial.js';
 import { captureStepToTutorialAction } from './types/action.js';
 import { generateDeterministicNarration } from './narrative.js';
@@ -26,7 +25,7 @@ export function narrationFromCaptureSession(
   return generateDeterministicNarration(actions, { title: session.title });
 }
 
-/** Stable id helper for tests/fixtures. */
+/** Stable id helper for tests/fixtures (Web Crypto — works in Node 20+ and browsers). */
 export function newSessionFixtureId(): string {
-  return randomUUID();
+  return crypto.randomUUID();
 }

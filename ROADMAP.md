@@ -9,8 +9,9 @@
 5. Narración determinista + normalización/agrupación (sin IA) — **hecho** (§16–17); borrador incluido en `avatarPrompt`.
 6. Scaffold WebExtensions / Studio (ADR-0006) — **hecho** (`apps/extension`, `apps/studio`).
 7. EventRecorder en content script + mensajería Zod — **hecho** (UC-0005; pack/build pendiente).
-8. Popup start/pause/stop cableado al SessionStore.
+8. Popup start/pause/stop cableado al SessionStore — **hecho** (UC-0006, build Vite/CRX).
 9. Studio: import JSON / edición de pasos.
+10. Pack Firefox + build unificado.
 
 ## Migración WebExtensions (destino)
 

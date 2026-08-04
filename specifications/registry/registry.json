@@ -71,6 +71,11 @@
       "id": "UC-0005",
       "path": "specifications/uc/UC-0005-extension-event-recorder.md",
       "status": "approved"
+    },
+    {
+      "id": "UC-0006",
+      "path": "specifications/uc/UC-0006-extension-popup.md",
+      "status": "approved"
     }
   ]
 }

@@ -3,17 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Toolsweb WebExtensions recorder (scaffold)",
+  "description": "Toolsweb WebExtensions recorder (Chromium MV3 + React popup)",
   "scripts": {
+    "dev": "vite",
+    "build": "vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:store": "tsx scripts/assert-session-store.mts"
   },
   "dependencies": {
     "@toolsweb/shared": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "webextension-polyfill": "^0.12.0"
   },
   "devDependencies": {
+    "@crxjs/vite-plugin": "^2.0.0-beta.28",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
     "@types/webextension-polyfill": "^0.12.1",
-    "typescript": "^5.8.2"
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vite": "^5.4.14"
   }
 }

@@ -1,22 +1,32 @@
 # @toolsweb/extension
 
-Scaffold de la extensión WebExtensions (ADR-0004 / ADR-0006).
+Extensión WebExtensions (ADR-0004 / UC-0005 / UC-0006).
 
 ## Estado
 
-Stubs de **background**, **content** y **popup**. La grabación productiva sigue en el bridge Playwright (`packages/backend`) hasta completar EventRecorder + mensajería.
+- EventRecorder en content script + SessionStore en background.
+- Popup React: iniciar / pausar / reanudar / finalizar / exportar JSON.
+- Build Chromium MV3 con Vite + `@crxjs/vite-plugin`.
+- Firefox: manifesto stub; pack dedicado pendiente.
 
-## Manifests
-
-- `manifests/chromium.json` — MV3 Chromium/Edge
-- `manifests/firefox.json` — MV3 Firefox (`browser_specific_settings.gecko`)
-
-`host_permissions: <all_urls>` es solo para desarrollo; producción debe restringir orígenes (Prompt Maestro §19).
-
-## Comandos
+## Desarrollo
 
 ```bash
-npm run typecheck -w @toolsweb/extension
+npm install
+npm run build -w @toolsweb/shared
+npm run dev -w @toolsweb/extension
 ```
 
-Build/packaging Vite se añade en una fase posterior.
+Carga en Chrome: `chrome://extensions` → Modo desarrollador → **Cargar descomprimida** → `apps/extension/dist`.
+
+```bash
+npm run build -w @toolsweb/extension
+```
+
+## Mensajes
+
+Ver `@toolsweb/shared` → `extensionMessages.ts` y UC-0005.
+
+## Nota
+
+`host_permissions: <all_urls>` es para desarrollo; producción debe restringir orígenes (Prompt Maestro §19).

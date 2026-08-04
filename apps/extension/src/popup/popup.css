@@ -1,0 +1,109 @@
+:root {
+  color: #14212b;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 280px;
+  background: linear-gradient(165deg, #f4f7f8 0%, #e7eef1 100%);
+}
+
+.popup {
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popup h1 {
+  margin: 0;
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+
+.meta {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  color: #3d4f5c;
+}
+
+.meta strong {
+  color: #14212b;
+  font-weight: 600;
+}
+
+.url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 250px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button {
+  border: 1px solid #9aaeb8;
+  background: #fff;
+  color: #14212b;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: #2f6f7e;
+  background: #f0f7f9;
+}
+
+button:focus-visible {
+  outline: 2px solid #2f6f7e;
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: #2f6f7e;
+  border-color: #2f6f7e;
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+  background: #265a66;
+}
+
+button.danger {
+  border-color: #a33b3b;
+  color: #a33b3b;
+}
+
+.status-recording {
+  color: #8a1f1f;
+  font-weight: 600;
+}
+
+.error {
+  margin: 0;
+  color: #a33b3b;
+}
+
+.hint {
+  margin: 0;
+  font-size: 11px;
+  color: #5c6f7a;
+}
