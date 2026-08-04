@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server/index.ts",
-    "start": "node dist/server/index.js",
+    "dev": "env -u PLAYWRIGHT_BROWSERS_PATH tsx watch src/server/index.ts",
+    "start": "env -u PLAYWRIGHT_BROWSERS_PATH node dist/server/index.js",
+    "postinstall": "playwright install chromium",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

@@ -1,6 +1,6 @@
 {
   "project": "Toolsweb",
-  "updatedAt": "2026-08-03",
+  "updatedAt": "2026-08-04",
   "artifacts": [
     {
       "id": "TW-VOL-000",
@@ -80,6 +80,11 @@
     {
       "id": "UC-0007",
       "path": "specifications/uc/UC-0007-studio-action-session.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0008",
+      "path": "specifications/uc/UC-0008-video-production-prompt.md",
       "status": "approved"
     }
   ]

@@ -34,6 +34,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [pastedScript, setPastedScript] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
+  const [copiedVideoPrompt, setCopiedVideoPrompt] = useState(false);
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -167,6 +168,9 @@ export function App() {
             ...(data.session.fullScript && !body.session.fullScript
               ? { fullScript: data.session.fullScript }
               : {}),
+            ...(data.session.videoPrompt && !body.session.videoPrompt
+              ? { videoPrompt: data.session.videoPrompt }
+              : {}),
           });
         }
       } catch {
@@ -182,7 +186,11 @@ export function App() {
   }
 
   async function savePastedScript() {
-    if (!session?.id || !pastedScript.trim()) return;
+    if (!session?.id) return;
+    if (!pastedScript.trim()) {
+      setError('Pega el guión en el cuadro de texto antes de guardar.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -196,6 +204,11 @@ export function App() {
         throw new Error(data.error ?? `No se pudo guardar el guión (${res.status})`);
       }
       setSession(data.session);
+      setPastedScript(
+        data.session.productionScript?.trim() ||
+          data.session.fullScript?.spokenText?.trim() ||
+          pastedScript
+      );
       await refreshLog();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -265,7 +278,11 @@ export function App() {
         throw new Error(data.error ?? `Load failed (${res.status})`);
       }
       setSession(data.session);
-      setPastedScript('');
+      setPastedScript(
+        data.session.productionScript?.trim() ||
+          data.session.fullScript?.spokenText?.trim() ||
+          ''
+      );
       setRecording(false);
       setActiveSessionId(null);
     } catch (e) {
@@ -541,7 +558,9 @@ export function App() {
               </p>
               <h2 className="mt-1 text-lg font-semibold text-white">1. Copia y ejecuta el prompt</h2>
               <p className="mt-1 text-xs text-slate-500">
-                Pégalo en ChatGPT, Gemini, Claude, etc. La respuesta debe ser solo el guión narrativo.
+                Pégalo en ChatGPT, Gemini, Claude, etc. La respuesta debe ser la tabla TSV de
+                producción (Paso / Tiempo / Duración / Acción visual / Narración), una fila por
+                captura.
               </p>
             </div>
             <button
@@ -562,11 +581,17 @@ export function App() {
           </pre>
 
           <h3 className="mt-6 text-sm font-semibold text-white">2. Pega aquí el guión que devolvió la AI</h3>
+          <p className="mt-1 text-xs text-slate-500">
+            Se guarda en esta sesión de la bitácora. Al Abrir de nuevo, el texto vuelve a aparecer aquí.
+            {session.fullScript?.spokenText || session.productionScript
+              ? ' Hay un guión guardado: edítalo y pulsa Guardar para actualizar.'
+              : ''}
+          </p>
           <textarea
             className="mt-2 min-h-[140px] w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none ring-emerald-500 focus:ring-2"
             value={pastedScript}
             onChange={(e) => setPastedScript(e.target.value)}
-            placeholder="Primero, haz clic en… Luego ingresa…"
+            placeholder="Tabla TSV o guión narrativo…"
             disabled={busy}
           />
           <button
@@ -613,6 +638,40 @@ export function App() {
               </pre>
             </details>
           ) : null}
+        </section>
+      ) : null}
+
+      {session && !recording && session.videoPrompt ? (
+        <section className="rounded-2xl border border-violet-900/50 bg-slate-900/70 p-6 shadow-xl">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-violet-400/90">
+                Video · prompt para AI de producción
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-white">
+                3. Copia el prompt de video (guión + pantallas + tiempos)
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Pégalo en HeyGen, Synthesia, CapCut IA, Claude, etc. Incluye locución y timeline de
+                pantallas.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-800"
+              onClick={() => {
+                void navigator.clipboard.writeText(session.videoPrompt ?? '').then(() => {
+                  setCopiedVideoPrompt(true);
+                  window.setTimeout(() => setCopiedVideoPrompt(false), 2000);
+                });
+              }}
+            >
+              {copiedVideoPrompt ? 'Copiado' : 'Copiar prompt de video'}
+            </button>
+          </div>
+          <pre className="mt-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs leading-relaxed text-slate-300">
+            {session.videoPrompt}
+          </pre>
         </section>
       ) : null}
 

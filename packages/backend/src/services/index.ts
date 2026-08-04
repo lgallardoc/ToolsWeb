@@ -4,6 +4,11 @@ export { PdfExporterService } from './PdfExporterService.js';
 export { SessionLogService } from './SessionLogService.js';
 export { AvatarPromptService } from './AvatarPromptService.js';
 export {
+  attachVideoPrompt,
+  buildVideoProductionPrompt,
+  buildVideoTimeline,
+} from './VideoProductionPromptService.js';
+export {
   MetadataExtractor,
   extractElementMetadata,
   EXTRACT_ELEMENT_METADATA_JS,

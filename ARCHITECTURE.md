@@ -4,17 +4,25 @@ Documento **descriptivo** del runtime actual. No sustituye `specifications/` ni 
 
 ## Objetivo
 
-Capturar acciones de navegación web (clicks, inputs, screenshots) y exportar tutoriales HTML5 standalone y PDF de alta calidad.
+Capturar acciones de navegación web y exportar:
+
+1. Tutoriales HTML5 / PDF (con subtítulos de narración si hay guión).
+2. Prompt de avatar estilo Synthesia (TSV) para cualquier AI externa (ADR-0003).
+3. Prompt de producción de video (`videoPrompt`, UC-0008).
+
+Destino de captura: **WebExtensions** (ADR-0004). Playwright + Express es **bridge** temporal.
 
 ## Monorepo (npm workspaces)
 
 | Package | Nombre npm | Rol |
 |---------|------------|-----|
-| `packages/shared` | `@toolsweb/shared` | Tipos + Zod (`CaptureStep`, `TutorialSession`, requests) |
-| `packages/backend` | `@toolsweb/backend` | Express API + Playwright (recorder + PDF) + Handlebars HTML |
-| `packages/frontend` | `@toolsweb/frontend` | UI Vite + React + Tailwind (control de sesión / bitácora / preview) |
+| `packages/shared` | `@toolsweb/shared` | Zod (`CaptureStep`, `TutorialAction`, mensajes extensión), privacy, narración, `distributeSpokenToSteps` |
+| `packages/backend` | `@toolsweb/backend` | Express API + Playwright recorder + export HTML/PDF + prompts |
+| `packages/frontend` | `@toolsweb/frontend` | UI bitácora / preview / guión / video prompt |
+| `apps/extension` | `@toolsweb/extension` | WebExtensions MV3 (EventRecorder + popup) |
+| `apps/studio` | `@toolsweb/studio` | Edición `ActionSession` (Vite :5174) |
 
-## Capas backend
+## Capas backend (bridge)
 
 ```
 routes (Express) → services → Playwright / filesystem
@@ -22,17 +30,17 @@ routes (Express) → services → Playwright / filesystem
 
 | Service / módulo | Responsabilidad |
 |------------------|-----------------|
-| `RecorderService` | Sesión Playwright, listeners DOM, highlight, settle, screenshot → `CaptureStep` |
-| `MetadataExtractor` | Metadata semántica del target — gated por `ENABLE_AVATAR_SCRIPT` (UC-0003/0004) |
-| `AvatarPromptService` | Arma `avatarPrompt` al stop (sin APIs LLM) — UC-0004 |
-| `SessionLogService` | Bitácora cifrada en disco |
-| `HtmlExporterService` | `TutorialSession` → HTML5 standalone (Handlebars + Tailwind CDN) |
-| `PdfExporterService` | HTML → PDF vía `page.pdf()` |
-| `lib/blankScreenshot.ts` | Detecta PNG ≥90% uniforme (omite el paso) |
-| `recorder/captureReady.ts` | Espera estabilización antes del screenshot |
-| `recorder/captureInitScript.ts` | JS plano inyectado (listeners, cursor, highlight) |
-
-Captura en página: `services/recorder/captureInitScript.ts` exporta **string JS plano** (`CAPTURE_INIT_SCRIPT`) — ver ADR-0002.
+| `RecorderService` | Sesión Playwright, cola in-page, highlight, screenshot → `CaptureStep` |
+| `MetadataExtractor` | Metadata semántica — gated por `ENABLE_AVATAR_SCRIPT` (UC-0003/0004) |
+| `AvatarPromptService` | `avatarPrompt` al stop: pide tabla TSV Synthesia 1:1 por paso (UC-0004) |
+| `importAvatarScript` | Pega AI → `productionScript` + `fullScript` + `steps[].avatarScript` + `videoPrompt` |
+| `VideoProductionPromptService` | `videoPrompt` (guión + timeline de pantallas) — UC-0008 |
+| `SessionLogService` | Bitácora cifrada; recupera `productionScript` desde guía en `videoPrompt` si falta |
+| `HtmlExporterService` | HTML5 con subtítulo de narración por captura |
+| `PdfExporterService` | HTML → PDF vía Chromium headless (`page.pdf()`) |
+| `lib/blankScreenshot.ts` | Detecta PNG ≥90% uniforme |
+| `recorder/captureReady.ts` | Estabilización pre-screenshot |
+| `recorder/captureInitScript.ts` | JS plano inyectado (ADR-0002) |
 
 Artefactos en disco:
 
@@ -40,43 +48,32 @@ Artefactos en disco:
 - Bitácora: `packages/backend/data/sessions/<id>.json.enc`
 - Perfiles browser: `packages/backend/data/browser-profiles/<browser>/` (gitignored)
 
-## Grabación (flujo)
+## Grabación (flujo bridge)
 
 ```mermaid
 flowchart TD
   start[POST /sessions/start] --> open[Abre Playwright + init scripts]
-  open --> event[click / input / navigate]
-  event --> freeze[Freeze click si aplica]
-  freeze --> paint[Highlight en vista actual]
-  paint --> shot[screenshot viewport inmediato]
-  shot --> blank{PNG >=90% uniforme?}
-  blank -->|sí| skip[Descarta paso]
+  open --> event[click / input / select / navigate]
+  event --> queue[Cola in-page __toolswebQueue]
+  queue --> drain[Drain Node ~120ms]
+  drain --> paint[Highlight + cursor]
+  paint --> shot[screenshot viewport]
+  shot --> blank{PNG blank navigate?}
+  blank -->|sí| skip[Descarta]
   blank -->|no| save[Persiste CaptureStep]
-  skip --> replay[Replay click / continúa]
-  save --> replay
-  replay --> stop[Stop session en UI Toolsweb]
-  stop --> log[Guarda bitácora]
+  skip --> next[Siguiente gesto]
+  save --> next
+  next --> stop[Stop UI Toolsweb]
+  stop --> prompt[avatarPrompt TSV]
+  prompt --> log[Guarda bitácora]
 ```
-
-### Highlights
-
-- Caja alrededor del target (click = rojo, focus/input = verde).
-- En clicks: **icono SVG de cursor** en el punto (`clientX/Y`), no un círculo.
-- Re-pintado desde Node justo antes del shot para sincronizar frame.
-
-### Clicks y scroll
-
-- **Freeze** (`preventDefault` + replay) en la mayoría de clicks para capturar el frame **pre-navegación** con highlight; luego se reproduce el gesto.
-- Excepciones nativas: checkbox / radio / file / range / select (y labels asociadas) — gesto inmediato.
-- Scrollbars no se interceptan.
-- Clicks en highlight Toolsweb no generan pasos.
 
 ### Calidad de captura (UC-0002)
 
-1. **Clicks**: freeze del gesto → highlight → screenshot **instantáneo** (sin esperar networkidle) → replay. Así el highlight coincide con la pantalla del evento, no con la siguiente.
-2. **Navigate**: estabilización larga (carga / red / animaciones).
-3. **Omitir vacíos**: `isMostlyBlankPng` — si ≥90% de muestras caen en el mismo bucket de color, no se guarda el paso.
-4. **Stop**: solo desde la UI Toolsweb (`Stop session`). Sin panel flotante en el browser grabado.
+1. Gestos encolados en página; Node drena con ack de freeze.
+2. Clicks: highlight sincronizado con el shot (sin race que limpie el anillo).
+3. Navigate: estabilización; blank skip solo en navigate cuando aplica.
+4. Stop solo desde UI Toolsweb.
 
 ### Perfil de browser y login
 
@@ -84,68 +81,79 @@ flowchart TD
 |--------------|--------|
 | `browser` | `chrome` \| `chromium` \| `firefox` \| `webkit` (default `chrome`) |
 | `persistentProfile: true` (default) | Cookies en `data/browser-profiles/<browser>/` |
-| `freshLogin: true` | Contexto **efímero** (pide login / cambiar usuario); no borra el perfil persistente |
+| `freshLogin: true` | Contexto efímero; no borra el perfil persistente |
 
-`chrome` + canal instalado mejora OAuth Google frente a Chromium embebido.
+## Flujo guión / video
 
-### Detener la grabación
+```mermaid
+flowchart LR
+  stop[Stop] --> ap[avatarPrompt]
+  ap --> ai[AI externa]
+  ai --> paste[POST avatar-script]
+  paste --> ps[productionScript]
+  paste --> fs[fullScript]
+  paste --> sub[avatarScript por paso]
+  paste --> vp[videoPrompt]
+  sub --> prev[Preview subtítulos]
+  sub --> exp[HTML/PDF]
+```
 
-- Stop desde la UI Toolsweb (`POST /api/sessions/stop`).
-- La UI detecta fin de grabación vía poll de `GET /api/sessions`.
+- Tabla TSV detectada → subtítulos por `stepNumber`; locución limpia en `fullScript`.
+- Texto plano → párrafos a pasos interactivos.
+- Al Abrir sesión, el textarea restaura `productionScript` (o `fullScript`).
 
 ## API actual
 
 | Method | Path | Notas |
 |--------|------|-------|
-| `POST` | `/api/sessions/start` | Body Zod `StartSessionRequest` (`freshLogin`, `persistentProfile`, …) |
-| `POST` | `/api/sessions/stop` | Cierra browser; guarda bitácora; `TutorialSession` |
-| `POST` | `/api/sessions/force-stop` | Recupera grabación huérfana |
-| `GET` | `/api/sessions` | Bitácora + `activeSessionId` / `recording` |
-| `GET` | `/api/sessions/:sessionId` | Live o bitácora; `?withImages=1` hidrata `imageBase64` |
-| `DELETE` | `/api/sessions/:sessionId` | Elimina bitácora + capturas |
-| `POST` | `/api/export/html` | Attachment `.html` (payload session) |
-| `POST` | `/api/export/pdf` | Attachment `.pdf` |
-| `POST` | `/api/export/html/:sessionId` | HTML desde bitácora |
-| `POST` | `/api/export/pdf/:sessionId` | PDF desde bitácora |
+| `POST` | `/api/sessions/start` | `StartSessionRequest` |
+| `POST` | `/api/sessions/stop` | Bitácora + `avatarPrompt` |
+| `POST` | `/api/sessions/force-stop` | Grabación huérfana |
+| `GET` | `/api/sessions` | Lista + `activeSessionId` |
+| `GET` | `/api/sessions/:sessionId` | `?withImages=1`; refresca prompt Synthesia si legacy |
+| `POST` | `/api/sessions/:sessionId/avatar-script` | Import guión |
+| `DELETE` | `/api/sessions/:sessionId` | Borra bitácora + capturas |
+| `POST` | `/api/export/html` / `pdf` | Payload session |
+| `POST` | `/api/export/html\|pdf/:sessionId` | Desde bitácora |
 | `GET` | `/health` | Liveness |
 
-Puertos por defecto: API `127.0.0.1:4410`, UI `127.0.0.1:5173` (proxy `/api`).
+Puertos: API `127.0.0.1:4410`, UI `127.0.0.1:5173`, Studio `5174`.
 
 ## Frontend
 
-- Control de sesión, bitácora (abrir / exportar / eliminar).
-- **Step preview** (UC-0001): diapositiva por paso, teclado, fullscreen.
-- Sync de estado al detener desde la UI.
+- Sesión, bitácora, preview (UC-0001) con subtítulos.
+- Copiar `avatarPrompt` / pegar guión / copiar `videoPrompt`.
+- Export HTML/PDF con narración.
 
 ## Configuración (`.env`)
 
-Ver `.env.example` en la raíz:
-
 | Variable | Default | Uso |
 |----------|---------|-----|
-| `BACKEND_HOST` / `BACKEND_PORT` | `127.0.0.1` / `4410` | API Express |
+| `BACKEND_HOST` / `BACKEND_PORT` | `127.0.0.1` / `4410` | API |
 | `FRONTEND_HOST` / `FRONTEND_PORT` | `127.0.0.1` / `5173` | Vite UI |
-| `VITE_BACKEND_URL` | derivado de backend | Proxy Vite → API |
-| `TOOLSWEB_ENCRYPTION_KEY` | *(requerida para bitácora)* | AES-256-GCM at-rest (`openssl rand -hex 32`) |
+| `VITE_BACKEND_URL` | derivado | Proxy `/api` |
+| `TOOLSWEB_ENCRYPTION_KEY` | requerida | AES-256-GCM |
+| `ENABLE_AVATAR_SCRIPT` | `true` | Metadata + prompt al stop |
+
+Playwright: `dev`/`start` del backend ejecutan con `env -u PLAYWRIGHT_BROWSERS_PATH` para evitar el cache sandbox de Cursor.
 
 ## Specs relacionadas
 
 | Id | Path |
 |----|------|
-| UC-0001 | `specifications/uc/UC-0001-step-preview.md` |
-| UC-0002 | `specifications/uc/UC-0002-capture-quality-and-in-browser-stop.md` |
-| ADR-0002 | `specifications/adr/ADR-0002-playwright-plain-js-injection.md` |
-| ASSUMP-0001 | `specifications/assumptions/ASSUMP-0001-single-active-session.md` |
+| UC-0001…0008 | `specifications/uc/` |
+| ADR-0001…0006 | `specifications/adr/` |
+| ASSUMP-0001 | sesión única activa |
+| PRIVACY | `docs/PRIVACY.md` |
 
 ## Stack
 
 - TypeScript strict, Node ≥ 20, Express 4, Playwright, Zod, Handlebars, `pngjs`
-- React 18, Vite 5, Tailwind 3
+- React 18, Vite 5, Tailwind 3; extensión `@crxjs`
 
-## Límites conocidos (baseline)
+## Límites conocidos
 
-- Una sola sesión de grabación activa en memoria por proceso API (ASSUMP-0001).
-- Selectores DOM heurísticos (id / data-testid / name / path corto).
-- Screenshots viewport (no fullPage por defecto).
-- Passwords: valor no se muestra en claro en descripciones de step.
-- `networkidle` no siempre ocurre en SPAs; la estabilización es best-effort + omisión de frames uniformes.
+- Una sola grabación Playwright activa por proceso API (ASSUMP-0001).
+- Bridge: selectores heurísticos; screenshots viewport.
+- Extensión: pack Firefox / preview bbox pendiente (ROADMAP).
+- `networkidle` best-effort en SPAs.

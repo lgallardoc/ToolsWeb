@@ -20,6 +20,22 @@ const CAPTURES_ROOT = path.resolve(__dirname, '../../captures');
 
 type StoredSession = TutorialSession & { stoppedAt: string };
 
+/** Recover raw TSV paste previously appended into videoPrompt (legacy sessions). */
+function extractProductionGuideFromVideoPrompt(videoPrompt?: string): string | undefined {
+  if (!videoPrompt) return undefined;
+  const startMark = 'GUÍA DE PRODUCCIÓN';
+  const start = videoPrompt.indexOf(startMark);
+  if (start < 0) return undefined;
+  const after = videoPrompt.slice(start);
+  const firstFence = after.indexOf('---');
+  if (firstFence < 0) return undefined;
+  const rest = after.slice(firstFence + 3);
+  const endFence = rest.indexOf('---');
+  if (endFence < 0) return undefined;
+  const body = rest.slice(0, endFence).trim();
+  return body.length > 0 ? body : undefined;
+}
+
 /**
  * Persist finished capture sessions (bitácora) encrypted at rest (AES-256-GCM).
  * Screenshots live under captures/<id>/ as .png.enc (or legacy .png).
@@ -107,6 +123,13 @@ export class SessionLogService {
         steps: raw.steps ?? [],
         ...(raw.avatarPrompt ? { avatarPrompt: raw.avatarPrompt } : {}),
         ...(raw.fullScript ? { fullScript: raw.fullScript } : {}),
+        ...(raw.productionScript
+          ? { productionScript: raw.productionScript }
+          : (() => {
+              const recovered = extractProductionGuideFromVideoPrompt(raw.videoPrompt);
+              return recovered ? { productionScript: recovered } : {};
+            })()),
+        ...(raw.videoPrompt ? { videoPrompt: raw.videoPrompt } : {}),
       });
       if (!opts?.withImages) return sanitizeTutorialSession(parsed);
       return sanitizeTutorialSession(await this.hydrateImages(parsed));

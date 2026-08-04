@@ -133,7 +133,7 @@ export function StepPreview({ session }: Props) {
             enter ? 'translate-x-0 opacity-100' : 'translate-x-6 opacity-0'
           }`}
         >
-          <div className="flex min-h-0 flex-1 items-center justify-center bg-[radial-gradient(ellipse_at_center,_#1e293b_0%,_#020617_70%)] p-3 sm:p-5">
+          <div className="relative flex min-h-0 flex-1 items-center justify-center bg-[radial-gradient(ellipse_at_center,_#1e293b_0%,_#020617_70%)] p-3 sm:p-5">
             {step.imageBase64 ? (
               <img
                 className="max-h-full max-w-full rounded-md object-contain shadow-2xl shadow-black/50 ring-1 ring-white/10"
@@ -143,6 +143,16 @@ export function StepPreview({ session }: Props) {
             ) : (
               <p className="text-sm text-slate-500">Sin captura de pantalla para este paso.</p>
             )}
+            {step.avatarScript?.spokenText ? (
+              <div
+                className="pointer-events-none absolute inset-x-3 bottom-3 z-10 flex justify-center sm:inset-x-6 sm:bottom-4"
+                aria-live="polite"
+              >
+                <p className="max-w-[92%] rounded-md bg-black/80 px-3 py-2 text-center text-[13px] font-medium leading-snug text-white shadow-lg ring-1 ring-white/15 sm:px-4 sm:py-2.5 sm:text-sm md:text-base">
+                  {step.avatarScript.spokenText}
+                </p>
+              </div>
+            ) : null}
           </div>
           <div className="border-t border-slate-800 bg-slate-900/95 px-4 py-3 backdrop-blur">
             <div className="flex items-start gap-3">
@@ -151,14 +161,6 @@ export function StepPreview({ session }: Props) {
               </span>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-white sm:text-base">{step.description}</p>
-                {step.avatarScript?.spokenText ? (
-                  <p className="mt-2 text-sm leading-relaxed text-emerald-100/90">
-                    <span className="mr-2 text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
-                      Guión
-                    </span>
-                    {step.avatarScript.spokenText}
-                  </p>
-                ) : null}
                 <p className="mt-1 truncate font-mono text-[11px] text-slate-400">
                   {step.action} · {step.url}
                 </p>

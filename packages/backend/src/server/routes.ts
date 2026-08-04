@@ -135,6 +135,8 @@ export function createApiRouter(): Router {
       if (mem) {
         mem.fullScript = updated.fullScript;
         mem.steps = updated.steps;
+        if (updated.productionScript) mem.productionScript = updated.productionScript;
+        if (updated.videoPrompt) mem.videoPrompt = updated.videoPrompt;
       }
       await sessionLog.save(updated);
       const hydrated = await sessionLog.get(sessionId, { withImages: true });
@@ -168,8 +170,12 @@ export function createApiRouter(): Router {
         res.status(404).json({ ok: false, error: `Session not found: ${sessionId}` });
         return;
       }
-      // Backfill prompt for sessions stopped before this feature / without interactive filter.
-      if (!stored.avatarPrompt && getEnv().enableAvatarScript) {
+      // Refresh avatar prompt when missing or still on legacy narrative-only format.
+      const needsPromptRefresh =
+        getEnv().enableAvatarScript &&
+        (!stored.avatarPrompt ||
+          !stored.avatarPrompt.includes('synthesia_tsv_production_script'));
+      if (needsPromptRefresh) {
         const withPrompt = avatarPrompt.attachPrompt(stored, {
           enableAvatarScript: true,
           force: true,

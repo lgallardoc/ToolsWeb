@@ -1,9 +1,12 @@
 import {
   AvatarScriptLlmResponseSchema,
+  distributeSpokenToSteps,
+  resolveSpokenForFullScript,
   type CaptureStep,
   type FullAvatarScript,
   type TutorialSession,
 } from '@toolsweb/shared';
+import { attachVideoPrompt } from './VideoProductionPromptService.js';
 
 function estimateDurationSec(spokenText: string): number {
   const words = spokenText.trim().split(/\s+/).filter(Boolean).length;
@@ -31,8 +34,30 @@ function buildFull(
   };
 }
 
+function withProductionGuide(
+  session: TutorialSession,
+  rawPaste: string,
+  tableDetected: boolean
+): TutorialSession {
+  const attached = attachVideoPrompt(session);
+  if (!tableDetected || !attached.videoPrompt) return attached;
+  if (rawPaste.trim() === session.fullScript?.spokenText.trim()) return attached;
+  return {
+    ...attached,
+    videoPrompt: [
+      attached.videoPrompt,
+      '',
+      'GUÍA DE PRODUCCIÓN (tabla / notas del autor — usar para edición visual):',
+      '---',
+      rawPaste.trim(),
+      '---',
+    ].join('\n'),
+  };
+}
+
 /**
- * Applies a pasted AI reply (plain narrative or optional JSON) onto a session.
+ * Applies a pasted AI reply (plain narrative, step table, or optional JSON).
+ * Persists `productionScript` = raw paste so UI can restore the textarea (UC-0004).
  */
 export function applyImportedAvatarScript(
   session: TutorialSession,
@@ -46,7 +71,9 @@ export function applyImportedAvatarScript(
     try {
       const parsed = AvatarScriptLlmResponseSchema.parse(JSON.parse(raw));
       let steps: CaptureStep[] = session.steps;
+      let mappedPerStep = false;
       if (parsed.steps && parsed.steps.length > 0) {
+        mappedPerStep = true;
         const byNumber = new Map(parsed.steps.map((s) => [s.stepNumber, s]));
         steps = session.steps.map((step) => {
           const gen = byNumber.get(step.stepNumber);
@@ -73,16 +100,30 @@ export function applyImportedAvatarScript(
           .join('\n\n');
 
       if (!fullSpoken) {
-        return { ...session, steps };
+        return { ...session, steps, productionScript: raw };
       }
 
       const fullScript = buildFull(fullSpoken, parsed.fullSsmlText);
-      return { ...session, steps, fullScript };
+      if (!mappedPerStep) {
+        steps = distributeSpokenToSteps(steps, fullSpoken);
+      }
+      return attachVideoPrompt({
+        ...session,
+        steps,
+        fullScript,
+        productionScript: raw,
+      });
     } catch {
-      /* fall through to plain text */
+      /* fall through to plain text / table */
     }
   }
 
-  const fullScript = buildFull(raw);
-  return { ...session, fullScript };
+  const { spokenText, table } = resolveSpokenForFullScript(raw);
+  const fullScript = buildFull(spokenText);
+  const steps = distributeSpokenToSteps(session.steps, raw);
+  return withProductionGuide(
+    { ...session, steps, fullScript, productionScript: raw },
+    raw,
+    Boolean(table)
+  );
 }

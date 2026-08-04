@@ -67,6 +67,9 @@ export function sanitizeTutorialSession(session: TutorialSession): TutorialSessi
     ...(session.avatarPrompt !== undefined
       ? { avatarPrompt: sanitizeTutorialText(session.avatarPrompt) }
       : {}),
+    ...(session.videoPrompt !== undefined
+      ? { videoPrompt: sanitizeTutorialText(session.videoPrompt) }
+      : {}),
     ...(session.fullScript
       ? {
           fullScript: {
@@ -75,6 +78,9 @@ export function sanitizeTutorialSession(session: TutorialSession): TutorialSessi
             estimatedDurationSec: session.fullScript.estimatedDurationSec,
           },
         }
+      : {}),
+    ...(session.productionScript !== undefined
+      ? { productionScript: sanitizeTutorialText(session.productionScript) }
       : {}),
   };
 }

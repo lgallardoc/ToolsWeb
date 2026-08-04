@@ -16,9 +16,10 @@ Permitir revisar una captura **como presentación HTML5** (estilo diapositiva): 
 
 1. Autor abre una sesión (Stop o bitácora con imágenes).
 2. Ve una “diapositiva” con screenshot + pie de descripción.
-3. Navega con **Siguiente / Anterior**, teclado, o indicadores de progreso.
-4. Opcional: **Pantalla completa** (Fullscreen API).
-5. En el último paso se indica fin del recorrido.
+3. Si hay `steps[].avatarScript.spokenText` (guión guardado, UC-0004), se muestra como **subtítulo** sobre la captura.
+4. Navega con **Siguiente / Anterior**, teclado, o indicadores de progreso.
+5. Opcional: **Pantalla completa** (Fullscreen API).
+6. En el último paso se indica fin del recorrido.
 
 ## Contratos
 

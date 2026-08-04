@@ -7,3 +7,4 @@ export * from './sanitizeSession.js';
 export * from './normalizeActions.js';
 export * from './narrative.js';
 export * from './narrationFromSession.js';
+export * from './distributeScriptToSteps.js';

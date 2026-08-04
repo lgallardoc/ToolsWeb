@@ -71,6 +71,16 @@ export const TutorialSessionSchema = z.object({
   avatarPrompt: z.string().optional(),
   /** Locución guardada tras pegar la respuesta de la AI (UC-0004). */
   fullScript: FullAvatarScriptSchema.optional(),
+  /**
+   * Pegado original de la AI (tabla TSV / texto completo).
+   * Se muestra de nuevo en el textarea al Abrir la sesión.
+   */
+  productionScript: z.string().optional(),
+  /**
+   * Prompt para producción de video corto (guión + pantallas + tiempos).
+   * UC-0008 — se genera al guardar el guión.
+   */
+  videoPrompt: z.string().optional(),
 });
 export type TutorialSession = z.infer<typeof TutorialSessionSchema>;
 
