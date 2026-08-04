@@ -10,8 +10,9 @@
 6. Scaffold WebExtensions / Studio (ADR-0006) — **hecho** (`apps/extension`, `apps/studio`).
 7. EventRecorder en content script + mensajería Zod — **hecho** (UC-0005; pack/build pendiente).
 8. Popup start/pause/stop cableado al SessionStore — **hecho** (UC-0006, build Vite/CRX).
-9. Studio: import JSON / edición de pasos.
+9. Studio: import JSON / edición de pasos — **hecho** (UC-0007, Vite port 5174).
 10. Pack Firefox + build unificado.
+11. Preview visual con bounding boxes / cursor (Prompt Maestro §23 Fase 10).
 
 ## Migración WebExtensions (destino)
 

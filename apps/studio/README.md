@@ -1,9 +1,20 @@
 # @toolsweb/studio
 
-Scaffold del estudio de tutoriales (ADR-0006).
+Studio MVP (UC-0007): importar / editar / exportar `ActionSession` JSON.
 
-## Estado
+## Comandos
 
-Placeholder tipado. La UI operativa actual es `packages/frontend` (bitácora / preview / prompt avatar).
+```bash
+npm run build -w @toolsweb/shared
+npm run dev -w @toolsweb/studio
+```
 
-Fases siguientes: importar JSON `ActionSession`, editar/reordenar pasos, export corregido.
+Abre [http://127.0.0.1:5174](http://127.0.0.1:5174).
+
+## Funciones
+
+- Importar JSON validado con `ActionSessionSchema`
+- Listar pasos (tipo, contexto, localizador, posición, narración)
+- Reordenar / eliminar / editar narración
+- Regenerar narración determinista
+- Exportar JSON

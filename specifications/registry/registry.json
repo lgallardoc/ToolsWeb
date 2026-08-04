@@ -76,6 +76,11 @@
       "id": "UC-0006",
       "path": "specifications/uc/UC-0006-extension-popup.md",
       "status": "approved"
+    },
+    {
+      "id": "UC-0007",
+      "path": "specifications/uc/UC-0007-studio-action-session.md",
+      "status": "approved"
     }
   ]
 }
