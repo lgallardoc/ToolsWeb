@@ -8,10 +8,13 @@
     "start": "env -u PLAYWRIGHT_BROWSERS_PATH node dist/server/index.js",
     "postinstall": "playwright install chromium",
     "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "video:validate": "tsx src/cli/video.ts validate",
+    "video:build": "tsx src/cli/video.ts build"
   },
   "dependencies": {
     "@toolsweb/shared": "*",
+    "@toolsweb/video-renderer": "*",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",

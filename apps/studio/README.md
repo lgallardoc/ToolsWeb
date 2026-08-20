@@ -9,7 +9,8 @@ npm run build -w @toolsweb/shared
 npm run dev -w @toolsweb/studio
 ```
 
-Abre [http://127.0.0.1:5174](http://127.0.0.1:5174).
+Abre `http://STUDIO_HOST:STUDIO_PORT/` (default `http://127.0.0.1:5174`).  
+Puertos en `.env` raíz: `STUDIO_HOST`, `STUDIO_PORT`.
 
 ## Funciones
 

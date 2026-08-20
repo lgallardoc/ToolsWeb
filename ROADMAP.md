@@ -2,47 +2,49 @@
 
 ## Hecho (integrado en main)
 
-1. Bridge Playwright estabilizado — cola in-page + highlights (UC-0002).
-2. **ADR-0004** — pivot WebExtensions documentado; Playwright como bridge.
+1. Bridge Playwright — cola in-page, highlights, OAuth Google, coalescing input (UC-0002).
+2. **ADR-0004** — pivot WebExtensions; Playwright como bridge.
 3. Contratos duales `CaptureStep` + `TutorialAction` — **ADR-0005**.
 4. PrivacyFilter + `docs/PRIVACY.md`.
-5. Narración determinista + normalización (sin IA) en `avatarPrompt`.
+5. Narración determinista en `avatarPrompt`.
 6. Scaffold `apps/extension` + `apps/studio` — **ADR-0006**.
-7. EventRecorder + mensajería Zod — **UC-0005**.
-8. Popup start/pause/stop/export — **UC-0006**.
-9. Studio import/edit/export ActionSession — **UC-0007**.
-10. Prompt de producción de video — **UC-0008**.
-11. Prompt avatar formato Synthesia TSV + import (`productionScript`, subtítulos preview/export) — **UC-0004**.
+7. EventRecorder + popup extensión — **UC-0005 / UC-0006**.
+8. Studio ActionSession — **UC-0007**.
+9. Prompt producción video — **UC-0008**.
+10. Prompt avatar TSV + import guión — **UC-0004**.
+11. **Video local** Remotion + TTS + Clipchamp — **UC-0009 / ADR-0007 / ADR-0008**.
+12. Purge sesión completa — **UC-0010**.
+13. Sticky menu modules — **UC-0011**.
+14. Script `scripts/dev.sh` + puertos paramétricos + CORS auto.
+15. Documentación runtime con diagramas — `ARCHITECTURE.md`.
 
 ## Activo
 
-1. Pack Firefox + build unificado de la extensión.
-2. Preview visual con bounding boxes / cursor (Prompt Maestro §23 Fase 10).
-3. Migrar el flujo de autoría primario de Playwright → extensión cuando el pack esté listo.
+1. Polish Remotion (cámara cinemática ADR-0008, tiempos, TTS cross-platform).
+2. Pack Firefox + build unificado extensión.
+3. Preview visual bounding boxes / cursor (Prompt Maestro §23 Fase 10).
+4. Migrar autoría primaria Playwright → extensión.
 
 ## Migración WebExtensions (destino)
 
-Orden sugerido (Prompt Maestro §23):
-
-1. Fundaciones monorepo / contracts / Vitest — *parcial*.
-2. Núcleo semántico (`analyzeElement`).
-3. Privacidad — *hecho en shared*.
-4. EventRecorder — *hecho (Chromium)*.
-5. Extensión Chromium — *MVP*.
-6. Firefox adapters / pack.
-7. SPA history + MutationObserver (`interfaceChange`).
-8. Tutorial engine (normalize / group / narrative) — *parcial en shared*.
-9. Studio React — *MVP*.
-10. Vista previa con bounding boxes / cursor.
+1. Fundaciones monorepo — *parcial*.
+2. Núcleo semántico — *parcial*.
+3. Privacidad — *hecho*.
+4. EventRecorder Chromium — *hecho*.
+5. Extensión Chromium MVP — *hecho*.
+6. Firefox adapters / pack — *pendiente*.
+7. SPA history + MutationObserver.
+8. Tutorial engine — *parcial en shared*.
+9. Studio React MVP — *hecho*.
+10. Preview bbox / cursor — *pendiente*.
 
 ## Deprecación
 
-- Playwright CDP capture, Express recorder y screenshots-por-acción: **bridge** hasta que la extensión cubra grabación + bitácora + export.
-- Evaluar pnpm en ADR de follow-up si el monorepo crece.
+- Playwright + Express recorder: **bridge** hasta cobertura extensión.
+- Evaluar pnpm si el monorepo crece (ADR follow-up).
 
 ## Posterior
 
-- Capturas estratégicas (no por cada gesto).
 - Auth / sync / backend cloud.
-- Integraciones opcionales de voz / Remotion / FFmpeg / MP4 (siempre fuera del core, ADR-0003).
+- TTS no-macOS (ADR dedicado).
 - Safari packaging.

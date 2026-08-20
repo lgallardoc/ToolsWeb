@@ -11,10 +11,20 @@
     "dev": "npm run dev -w @toolsweb/backend",
     "dev:api": "npm run dev -w @toolsweb/backend",
     "dev:ui": "npm run dev -w @toolsweb/frontend",
+    "dev:stack": "bash scripts/dev.sh start",
+    "dev:stack:stop": "bash scripts/dev.sh stop",
+    "dev:stack:restart": "bash scripts/dev.sh restart",
+    "dev:stack:status": "bash scripts/dev.sh status",
     "build": "npm run build -w @toolsweb/shared && npm run build -w @toolsweb/backend && npm run build -w @toolsweb/frontend",
     "build:shared": "npm run build -w @toolsweb/shared",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run typecheck"
+    "lint": "npm run typecheck",
+    "video:validate": "npm run video:validate -w @toolsweb/backend --",
+    "video:build": "npm run video:build -w @toolsweb/backend --",
+    "video:preview": "npm run video:preview -w @toolsweb/video-renderer --",
+    "video:render": "npm run video:render -w @toolsweb/video-renderer --",
+    "video:scene": "npm run video:scene -w @toolsweb/video-renderer --",
+    "test": "npm run test -w @toolsweb/shared && npm run test -w @toolsweb/video-renderer"
   },
   "engines": {
     "node": ">=20"

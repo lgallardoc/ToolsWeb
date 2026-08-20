@@ -1,4 +1,5 @@
-import { EXTRACT_ELEMENT_METADATA_JS } from '../MetadataExtractor.js';
+import { EXTRACT_ELEMENT_METADATA_JS, DETECT_PRIMARY_NAV_MODULE_JS } from '../MetadataExtractor.js';
+import { AUTH_HOST_PAGE_JS } from './authHostPageScript.js';
 
 /**
  * Plain browser JS injected via Playwright addInitScript({ content }).
@@ -33,7 +34,13 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
 
   ${EXTRACT_ELEMENT_METADATA_JS}
 
+  ${DETECT_PRIMARY_NAV_MODULE_JS}
+
+  ${AUTH_HOST_PAGE_JS}
+
   function applyMetadata(payload, el) {
+    var navMod = detectPrimaryNavModule(el);
+    if (navMod) payload.menuModuleTrigger = navMod;
     if (!w.__toolswebEnableAvatarScript) return payload;
     var meta = extractElementMetadata(el);
     if (meta.ariaLabel) payload.ariaLabel = meta.ariaLabel;
@@ -250,7 +257,7 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
           resolve(undefined);
           return;
         }
-        setTimeout(tick, 40);
+        setTimeout(tick, 30);
       }
       tick();
     });
@@ -493,8 +500,10 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
   /**
    * Freeze clicks that may navigate / change the main view before the shot.
    * Never freeze form fields or list widgets — freeze breaks focus, typing and dropdowns.
+   * Never freeze on OAuth hosts (Google "Siguiente", etc.) — preventDefault + replayClick breaks their UI.
    */
   function shouldFreezeForScreenshot(target) {
+    if (isAuthHostPage()) return false;
     if (!target || !target.closest) return false;
     if (
       target.closest(
@@ -660,8 +669,43 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
     listenerOpts
   );
 
-  var inputTimer = null;
-  var lastInputKey = '';
+  var fieldSessions = Object.create(null);
+  var lastFocusKey = '';
+  var inputFinalTimer = null;
+  var inputFinalSelector = '';
+
+  function fieldValue(el) {
+    if (!el) return '';
+    var tag = el.tagName;
+    if (tag === 'SELECT') return selectedLabel(el);
+    if (el.isContentEditable) {
+      return String(el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    }
+    return String(el.value || '').slice(0, 200);
+  }
+
+  /** INPUT/TEXTAREA/contenteditable — coalesce to focus + final value only (UC-0002). */
+  function isTextEntryField(el) {
+    if (!el || el.nodeType !== 1) return false;
+    var tag = el.tagName;
+    if (tag === 'INPUT') {
+      var type = String(el.type || 'text').toLowerCase();
+      return (
+        type !== 'checkbox' &&
+        type !== 'radio' &&
+        type !== 'button' &&
+        type !== 'submit' &&
+        type !== 'reset' &&
+        type !== 'file' &&
+        type !== 'hidden'
+      );
+    }
+    if (tag === 'TEXTAREA') return true;
+    if (el.isContentEditable) return true;
+    if (!el.getAttribute) return false;
+    var role = String(el.getAttribute('role') || '').toLowerCase();
+    return role === 'textbox' || role === 'searchbox';
+  }
 
   function selectedLabel(el) {
     try {
@@ -681,12 +725,7 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
     var selector = buildSelector(target);
     var value = isPassword
       ? '••••••'
-      : (tag === 'SELECT' ? selectedLabel(target) : String(target.value || '')).slice(0, 200);
-    var key = selector + '::' + value;
-    // Coalesce noisy input events; always keep change/blur so each option picks a step.
-    if (key === lastInputKey && eventType === 'input') return;
-
-    lastInputKey = key;
+      : (tag === 'SELECT' ? selectedLabel(target) : fieldValue(target));
     var boundingBox = getBoundingBox(target);
     var isSelect = tag === 'SELECT';
     var payload = applyMetadata({
@@ -712,20 +751,67 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
     emit(payload);
   }
 
+  function flushTextFieldFinal(target, reason) {
+    if (!target || !isTextEntryField(target)) return;
+    var selector = buildSelector(target);
+    var session = fieldSessions[selector];
+    if (!session || !session.typed || session.finalCaptured) return;
+    if (fieldValue(target) === session.valueAtFocus) return;
+    session.finalCaptured = true;
+    flushFieldCapture(target, reason);
+  }
+
+  function scheduleTextFieldFinal(target) {
+    var selector = buildSelector(target);
+    if (inputFinalTimer) window.clearTimeout(inputFinalTimer);
+    inputFinalSelector = selector;
+    inputFinalTimer = window.setTimeout(function () {
+      inputFinalTimer = null;
+      inputFinalSelector = '';
+      flushTextFieldFinal(target, 'input');
+    }, 500);
+  }
+
   function onFieldEvent(event) {
     var target = eventElement(event) || event.target;
     if (!target) return;
     var tag = target.tagName;
-    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return;
 
-    if (inputTimer) window.clearTimeout(inputTimer);
-    var delay = event.type === 'change' || event.type === 'blur' ? 0 : 150;
-    inputTimer = window.setTimeout(function () {
-      flushFieldCapture(target, event.type);
-    }, delay);
+    if (tag === 'SELECT') {
+      if (event.type === 'change' || event.type === 'blur') {
+        flushFieldCapture(target, event.type);
+      }
+      return;
+    }
+
+    if (!isTextEntryField(target)) return;
+
+    var selector = buildSelector(target);
+
+    if (event.type === 'input') {
+      if (!fieldSessions[selector]) {
+        fieldSessions[selector] = {
+          valueAtFocus: fieldValue(target),
+          typed: false,
+          finalCaptured: false,
+        };
+      }
+      fieldSessions[selector].typed = true;
+      scheduleTextFieldFinal(target);
+      return;
+    }
+
+    if (event.type === 'blur' || event.type === 'change') {
+      if (inputFinalTimer && inputFinalSelector === selector) {
+        window.clearTimeout(inputFinalTimer);
+        inputFinalTimer = null;
+        inputFinalSelector = '';
+      }
+      if (selector === lastFocusKey) lastFocusKey = '';
+      flushTextFieldFinal(target, event.type);
+      delete fieldSessions[selector];
+    }
   }
-
-  var lastFocusKey = '';
 
   function isFocusCaptureTarget(el) {
     if (!el || el.nodeType !== 1) return false;
@@ -751,6 +837,15 @@ export function buildCaptureInitScript(options: { enableAvatarScript: boolean })
       var selector = buildSelector(target);
       if (selector === lastFocusKey) return;
       lastFocusKey = selector;
+
+      if (isTextEntryField(target)) {
+        fieldSessions[selector] = {
+          valueAtFocus: fieldValue(target),
+          typed: false,
+          finalCaptured: false,
+        };
+      }
+
       var boundingBox = getBoundingBox(target);
       var payload = applyMetadata({
         action: 'input',

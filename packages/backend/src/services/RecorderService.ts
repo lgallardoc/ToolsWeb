@@ -18,7 +18,11 @@ import type {
   StartSessionRequest,
   TutorialSession,
 } from '@toolsweb/shared';
-import { sanitizeTutorialText, sanitizeTutorialUrl } from '@toolsweb/shared';
+import {
+  isSensitiveAuthUrl,
+  sanitizeTutorialText,
+  sanitizeTutorialUrl,
+} from '@toolsweb/shared';
 import { buildCaptureInitScript } from './recorder/captureInitScript.js';
 import { waitForCaptureReady } from './recorder/captureReady.js';
 import { isMostlyBlankPng } from '../lib/blankScreenshot.js';
@@ -63,6 +67,8 @@ type BrowserCapturePayload = {
   closestHeader?: string;
   formContext?: string;
   placeholder?: string;
+  /** UC-0011 — primary nav click label; recorder keeps sticky menuModule. */
+  menuModuleTrigger?: string;
 };
 
 type StepElementMetadata = {
@@ -70,6 +76,7 @@ type StepElementMetadata = {
   closestHeader?: string;
   formContext?: string;
   placeholder?: string;
+  menuModuleTrigger?: string;
 };
 
 function metadataFromPayload(payload: BrowserCapturePayload): StepElementMetadata {
@@ -78,6 +85,7 @@ function metadataFromPayload(payload: BrowserCapturePayload): StepElementMetadat
   if (payload.closestHeader) meta.closestHeader = payload.closestHeader;
   if (payload.formContext) meta.formContext = payload.formContext;
   if (payload.placeholder) meta.placeholder = payload.placeholder;
+  if (payload.menuModuleTrigger) meta.menuModuleTrigger = payload.menuModuleTrigger;
   return meta;
 }
 
@@ -187,6 +195,8 @@ export class RecorderService {
   private onStoppedFromBrowser: ((session: TutorialSession) => Promise<void>) | null = null;
   /** Survives after stop so finalize/avatar can read the session flag. */
   private avatarFlags = new Map<string, boolean>();
+  /** UC-0011 sticky main-menu module per live recording session. */
+  private menuModuleBySession = new Map<string, string>();
   /** Deduplicate binding + queue deliveries of the same gesture. */
   private recentGestureKeys = new Map<string, number>();
 
@@ -241,6 +251,7 @@ export class RecorderService {
 
     this.sessions.set(session.id, session);
     this.avatarFlags.set(session.id, enableAvatarScript);
+    this.menuModuleBySession.delete(session.id);
     this.activeSessionId = session.id;
     this.runtime = {
       browser,
@@ -288,17 +299,27 @@ export class RecorderService {
       // Re-assert listeners after every document load (SPA hard-nav / multi-page sites).
       void this.ensureCaptureInstalled(page);
 
-      if (runtime.suppressNavigationSteps || runtime.capturing) return;
+      if (runtime.suppressNavigationSteps) return;
       const url = frame.url();
       if (!url || url === 'about:blank') return;
       if (url === runtime.lastUrl) return;
       runtime.lastUrl = url;
       const capturedAt = new Date().toISOString();
+      const authScreen = isSensitiveAuthUrl(url);
       void this.enqueue(async () => {
+        await this.ensureCaptureInstalled(page);
+        let hostname = url;
+        try {
+          hostname = new URL(url).hostname;
+        } catch {
+          /* keep raw */
+        }
         await this.recordStep({
           action: 'navigate',
           url,
-          description: `Navigate to ${url}`,
+          description: authScreen
+            ? `Sign-in screen (${hostname})`
+            : `Navigate to ${url}`,
           target: {
             tagName: 'document',
             selector: 'document',
@@ -336,9 +357,10 @@ export class RecorderService {
     const runtime = this.runtime;
     if (!runtime) return;
     if (runtime.drainTimer) clearInterval(runtime.drainTimer);
+    const drainMs = getEnv().captureQueueDrainMs;
     runtime.drainTimer = setInterval(() => {
       void this.drainCaptureQueue(page);
-    }, 120);
+    }, drainMs);
   }
 
   private async drainCaptureQueue(page: Page): Promise<void> {
@@ -636,10 +658,18 @@ export class RecorderService {
         }
       }
 
+      const authNavigate =
+        input.action === 'navigate' && isSensitiveAuthUrl(input.url);
+      const captureEnv = getEnv();
+
       // Interaction: instant settle (no networkidle — that waited for the NEXT screen).
-      // Navigate: full ready wait.
+      // Navigate: full ready wait; OAuth hosts get a longer settle so login UI paints.
       await waitForCaptureReady(runtime.page, {
-        timeoutMs: input.action === 'navigate' ? 4000 : 200,
+        timeoutMs: isInteraction
+          ? 200
+          : authNavigate
+            ? captureEnv.captureAuthNavigateTimeoutMs
+            : 5000,
         instant: isInteraction,
       });
 
@@ -660,7 +690,9 @@ export class RecorderService {
             }
           );
           // Hold ring+cursor long enough to appear in the PNG.
-          await new Promise((r) => setTimeout(r, 60));
+          await new Promise((r) =>
+            setTimeout(r, captureEnv.captureHighlightHoldMs)
+          );
         } catch {
           /* ignore */
         }
@@ -685,7 +717,12 @@ export class RecorderService {
       }
 
       // UC-0002: blank-skip only navigate — keep click/input/select so option flows stay visible.
-      if (input.action === 'navigate' && isMostlyBlankPng(png, 0.9)) {
+      // Never skip OAuth / sign-in screens (Google login loaders can look mostly white).
+      if (
+        input.action === 'navigate' &&
+        !authNavigate &&
+        isMostlyBlankPng(png, 0.9)
+      ) {
         console.warn(
           `[RecorderService] Skipping blank/near-empty capture (navigate): ${input.description}`
         );
@@ -713,6 +750,13 @@ export class RecorderService {
       };
 
       const meta = input.metadata ?? {};
+      if (meta.menuModuleTrigger) {
+        this.menuModuleBySession.set(
+          sessionId,
+          sanitizeTutorialText(meta.menuModuleTrigger)
+        );
+      }
+      const stickyModule = this.menuModuleBySession.get(sessionId);
       const timestamp = isValidIsoTimestamp(input.capturedAt)
         ? input.capturedAt
         : new Date().toISOString();
@@ -738,6 +782,7 @@ export class RecorderService {
         ...(meta.placeholder !== undefined
           ? { placeholder: sanitizeTutorialText(meta.placeholder) }
           : {}),
+        ...(stickyModule ? { menuModule: stickyModule } : {}),
       };
 
       session.steps.push(step);

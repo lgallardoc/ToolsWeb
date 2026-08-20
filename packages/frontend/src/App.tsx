@@ -35,6 +35,21 @@ export function App() {
   const [pastedScript, setPastedScript] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedVideoPrompt, setCopiedVideoPrompt] = useState(false);
+  const [videoInfo, setVideoInfo] = useState<{
+    stepCount: number;
+    withNarration: number;
+    privacyWarning: string;
+  } | null>(null);
+  const [videoJob, setVideoJob] = useState<{
+    jobId: string;
+    status: string;
+    progress: number;
+    error?: string;
+    outputPath?: string;
+  } | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [stepBumper, setStepBumper] = useState(true);
+  const [stepBumperSeconds, setStepBumperSeconds] = useState(1.2);
 
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
@@ -316,6 +331,124 @@ export function App() {
       await refreshLog();
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function loadVideoProject() {
+    if (!session?.id) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API}/api/sessions/${session.id}/video-project`, {
+        method: 'POST',
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        stepCount?: number;
+        withNarration?: number;
+        privacyWarning?: string;
+        error?: string;
+        errors?: Array<{ message: string }>;
+      };
+      if (!res.ok || !data.ok) {
+        throw new Error(
+          data.errors?.[0]?.message ?? data.error ?? `video-project failed (${res.status})`
+        );
+      }
+      setVideoInfo({
+        stepCount: data.stepCount ?? 0,
+        withNarration: data.withNarration ?? 0,
+        privacyWarning:
+          data.privacyWarning ??
+          'El video puede contener información visible en las capturas originales.',
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startVideoRender(silent: boolean) {
+    if (!session?.id) return;
+    setBusy(true);
+    setError(null);
+    setVideoPreviewUrl(null);
+    try {
+      const res = await fetch(`${API}/api/sessions/${session.id}/video-render`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          silent,
+          stepBumper,
+          stepBumperSeconds,
+        }),
+      });
+      const data = (await res.json()) as {
+        ok: boolean;
+        job?: {
+          jobId: string;
+          status: string;
+          progress: number;
+          error?: string;
+          outputPath?: string;
+        };
+        error?: string;
+      };
+      if (!res.ok || !data.job) {
+        throw new Error(data.error ?? `video-render failed (${res.status})`);
+      }
+      setVideoJob(data.job);
+      const jobId = data.job.jobId;
+      const sessionId = session.id;
+      const poll = window.setInterval(() => {
+        void (async () => {
+          const r = await fetch(
+            `${API}/api/sessions/${sessionId}/video-render/${jobId}`
+          );
+          const j = (await r.json()) as { ok: boolean; job?: typeof data.job };
+          if (j.job) {
+            setVideoJob(j.job);
+            if (j.job.status === 'completed' || j.job.status === 'failed') {
+              window.clearInterval(poll);
+              setBusy(false);
+              if (j.job.status === 'completed') {
+                setVideoPreviewUrl(
+                  `${API}/api/sessions/${sessionId}/video-preview?t=${Date.now()}`
+                );
+              }
+            }
+          }
+        })();
+      }, 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  }
+
+  async function openVideoPreview() {
+    if (!session?.id) return;
+    setError(null);
+    const url = `${API}/api/sessions/${session.id}/video-preview`;
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+      });
+      if (!res.ok) {
+        let message = 'MP4 no generado. Usa «Generar MP4» primero.';
+        const contentType = res.headers.get('content-type') ?? '';
+        if (contentType.includes('application/json')) {
+          const data = (await res.json()) as { error?: string };
+          if (data.error) message = data.error;
+        }
+        throw new Error(message);
+      }
+      setVideoPreviewUrl(`${url}?t=${Date.now()}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setVideoPreviewUrl(null);
     }
   }
 
@@ -672,6 +805,99 @@ export function App() {
           <pre className="mt-4 max-h-80 overflow-auto whitespace-pre-wrap rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs leading-relaxed text-slate-300">
             {session.videoPrompt}
           </pre>
+        </section>
+      ) : null}
+
+      {session && !recording ? (
+        <section className="rounded-2xl border border-sky-900/50 bg-slate-900/70 p-6 shadow-xl">
+          <p className="text-xs uppercase tracking-[0.18em] text-sky-400/90">Video tutorial</p>
+          <h2 className="mt-1 text-lg font-semibold text-white">Generación local (UC-0009)</h2>
+          <p className="mt-2 text-xs text-amber-200/90">
+            El video puede contener información visible en las capturas originales. Revísalo antes
+            de compartirlo.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-300">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={stepBumper}
+                onChange={(e) => setStepBumper(e.target.checked)}
+                className="rounded border-slate-600"
+              />
+              Aviso «Paso N» entre escenas
+            </label>
+            <label className="inline-flex items-center gap-2">
+              Pausa tras aviso (s)
+              <input
+                type="number"
+                min={0}
+                max={8}
+                step={0.1}
+                disabled={!stepBumper}
+                value={stepBumperSeconds}
+                onChange={(e) => setStepBumperSeconds(Number(e.target.value) || 0)}
+                className="w-16 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-slate-100 disabled:opacity-40"
+              />
+            </label>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+              onClick={() => void loadVideoProject()}
+            >
+              Validar fuente
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="rounded-lg bg-sky-500 px-3 py-1.5 text-xs font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-50"
+              onClick={() => void startVideoRender(false)}
+              title="Usa VIDEO_TTS_VOICE (Paulina / es_MX) si está en macOS"
+            >
+              Generar MP4 (voz)
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="rounded-lg border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-100 hover:bg-slate-800 disabled:opacity-50"
+              onClick={() => void startVideoRender(true)}
+              title="Sin locución (WAV silenciosos)"
+            >
+              Generar MP4 (sin voz)
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              className="rounded-lg border border-sky-700 px-3 py-1.5 text-xs font-semibold text-sky-100 hover:bg-sky-950 disabled:opacity-50"
+              onClick={() => void openVideoPreview()}
+              title="Reproduce tutorial-final.mp4 si ya existe en disco"
+            >
+              Preview
+            </button>
+          </div>
+          {videoInfo ? (
+            <p className="mt-3 text-sm text-slate-300">
+              {videoInfo.stepCount} pasos · {videoInfo.withNarration} con narración
+            </p>
+          ) : null}
+          {videoJob ? (
+            <p className="mt-2 font-mono text-xs text-slate-400">
+              Job {videoJob.jobId.slice(0, 8)}… · {videoJob.status} · {videoJob.progress}%
+              {videoJob.error ? ` · ${videoJob.error}` : ''}
+              {videoJob.outputPath ? ` · ${videoJob.outputPath}` : ''}
+            </p>
+          ) : null}
+          {videoPreviewUrl ? (
+            <video
+              key={videoPreviewUrl}
+              className="mt-4 w-full rounded-xl border border-slate-800 bg-black"
+              controls
+              playsInline
+              src={videoPreviewUrl}
+            />
+          ) : null}
         </section>
       ) : null}
 

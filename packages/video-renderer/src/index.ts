@@ -1,0 +1,14 @@
+export { loadVideoRendererConfig, formatStepBumperText } from './config.js';
+export type { VideoRendererConfig } from './config.js';
+export { buildVideoProjectArtifacts, assembleClipchampPackage, createNarrationProvider } from './pipeline.js';
+export { computeSceneDurationSeconds, transitionForGapMs, cursorActionFor, transitionOverlapSeconds } from './duration.js';
+export { buildSrt, buildVtt, splitSubtitleCues } from './subtitles.js';
+export { storyboardToCsv } from './storyboardCsv.js';
+export { renderTutorialMp4 } from './remotion/render.js';
+export { VideoRenderError, toPublicError } from './errors.js';
+export type { NarrationAudioProvider } from './audio/types.js';
+export { SilentNarrationProvider, ExistingAudioNarrationProvider } from './audio/SilentNarrationProvider.js';
+export { MacOsSayNarrationProvider, isMacOsSayAvailable } from './audio/MacOsSayNarrationProvider.js';
+export { prepareMacOsSpeechText } from './audio/prepareMacOsSpeechText.js';
+export { cameraForFocus, lerpCamera, readPngSize } from './remotion/camera.js';
+export type { CameraTransform } from './remotion/camera.js';

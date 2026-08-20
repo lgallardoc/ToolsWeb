@@ -1,5 +1,8 @@
 import type { CaptureStep, TutorialSession } from '@toolsweb/shared';
-import { narrationFromCaptureSession } from '@toolsweb/shared';
+import {
+  computeSuggestedDurationSec,
+  narrationFromCaptureSession,
+} from '@toolsweb/shared';
 
 const PROMPT_INSTRUCTIONS = `Eres un experto en guiones de video tutoriales para avatares (Synthesia / HeyGen) y locución en español.
 
@@ -52,14 +55,11 @@ function stepContext(
       : 0;
 
   const startSec = elapsedMs / 1000;
-  const endSec =
-    nextElapsedMs !== null
-      ? Math.max(startSec + 2, nextElapsedMs / 1000)
-      : startSec + Math.max(3, gapMs > 0 ? gapMs / 1000 : 4);
-  const suggestedDurationSec = Math.max(
-    2,
-    Math.min(12, Math.round((endSec - startSec) * 10) / 10)
-  );
+  const suggestedDurationSec = computeSuggestedDurationSec({
+    elapsedMs,
+    nextElapsedMs,
+    gapMs,
+  });
 
   return {
     stepNumber: step.stepNumber,

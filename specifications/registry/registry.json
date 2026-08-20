@@ -1,6 +1,6 @@
 {
   "project": "Toolsweb",
-  "updatedAt": "2026-08-04",
+  "updatedAt": "2026-08-19",
   "artifacts": [
     {
       "id": "TW-VOL-000",
@@ -86,6 +86,31 @@
       "id": "UC-0008",
       "path": "specifications/uc/UC-0008-video-production-prompt.md",
       "status": "approved"
+    },
+    {
+      "id": "UC-0009",
+      "path": "specifications/uc/UC-0009-local-video-tutorial-generation.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0010",
+      "path": "specifications/uc/UC-0010-session-full-purge.md",
+      "status": "approved"
+    },
+    {
+      "id": "UC-0011",
+      "path": "specifications/uc/UC-0011-menu-module-sticky-grouping.md",
+      "status": "approved"
+    },
+    {
+      "id": "ADR-0007",
+      "path": "specifications/adr/ADR-0007-optional-local-video-renderer.md",
+      "status": "accepted"
+    },
+    {
+      "id": "ADR-0008",
+      "path": "specifications/adr/ADR-0008-cinematic-camera-video-renderer.md",
+      "status": "accepted"
     }
   ]
 }

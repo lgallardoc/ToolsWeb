@@ -8,3 +8,7 @@ export * from './normalizeActions.js';
 export * from './narrative.js';
 export * from './narrationFromSession.js';
 export * from './distributeScriptToSteps.js';
+export * from './types/video.js';
+export * from './buildVideoProjectSource.js';
+export * from './assignStickyMenuModules.js';
+export * from './suggestedDuration.js';

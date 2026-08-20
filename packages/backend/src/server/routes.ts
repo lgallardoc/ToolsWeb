@@ -13,8 +13,20 @@ import {
   RecorderService,
   SessionLogService,
   AvatarPromptService,
+  VideoProjectSourceService,
 } from '../services/index.js';
 import { applyImportedAvatarScript } from '../services/importAvatarScript.js';
+import {
+  createVideoJob,
+  getVideoJob,
+  updateVideoJob,
+  deleteVideoJobsForSession,
+} from '../services/videoRenderJobs.js';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createReadStream } from 'node:fs';
+import { access, stat } from 'node:fs/promises';
+import { assertSafeSessionId } from '../services/SessionLogService.js';
 
 const recorder = new RecorderService();
 const sessionLog = new SessionLogService();
@@ -195,6 +207,12 @@ export function createApiRouter(): Router {
     '/sessions/:sessionId',
     asyncHandler(async (req, res) => {
       const sessionId = String(req.params.sessionId ?? '');
+      try {
+        assertSafeSessionId(sessionId);
+      } catch {
+        res.status(400).json({ ok: false, error: 'sessionId inválido' });
+        return;
+      }
       if (recorder.isRecording(sessionId)) {
         res.status(409).json({
           ok: false,
@@ -202,12 +220,14 @@ export function createApiRouter(): Router {
         });
         return;
       }
-      const deleted = await sessionLog.delete(sessionId);
-      if (!deleted) {
+      const result = await sessionLog.delete(sessionId);
+      const jobRemoved = await deleteVideoJobsForSession(sessionId);
+      const removed = [...result.removed, ...jobRemoved];
+      if (!result.deleted && removed.length === 0) {
         res.status(404).json({ ok: false, error: `Session not found: ${sessionId}` });
         return;
       }
-      res.json({ ok: true, deleted: sessionId });
+      res.json({ ok: true, deleted: sessionId, removed });
     })
   );
 
@@ -278,6 +298,231 @@ export function createApiRouter(): Router {
         `attachment; filename="${safeName || 'tutorial'}.pdf"`
       );
       res.send(pdf);
+    })
+  );
+
+  const videoSource = new VideoProjectSourceService(sessionLog);
+  const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
+
+  /** Normalized audiovisual project (no render). */
+  router.post(
+    '/sessions/:sessionId/video-project',
+    asyncHandler(async (req, res) => {
+      const sessionId = String(req.params.sessionId ?? '');
+      const loaded = await videoSource.load(sessionId);
+      if (!loaded.ok) {
+        res.status(404).json({ ok: false, errors: loaded.errors });
+        return;
+      }
+      // Strip bulky dataUrls from JSON response — UI uses counts + narration flags.
+      const light = {
+        ...loaded.source,
+        steps: loaded.source.steps.map((s) => ({
+          ...s,
+          screenshot: {
+            mediaType: 'image/png' as const,
+            hasImage: Boolean(s.screenshot.dataUrl),
+          },
+        })),
+      };
+      res.json({
+        ok: true,
+        source: light,
+        stepCount: loaded.source.steps.length,
+        withNarration: loaded.source.steps.filter((s) => s.narration.trim()).length,
+        privacyWarning:
+          'El video puede contener información visible en las capturas originales. Revísalo antes de compartirlo.',
+      });
+    })
+  );
+
+  /** Queue local MP4 + Clipchamp package job (non-blocking). */
+  router.post(
+    '/sessions/:sessionId/video-render',
+    asyncHandler(async (req, res) => {
+      const sessionId = String(req.params.sessionId ?? '');
+      const body = (req.body ?? {}) as {
+        silent?: boolean;
+        stepBumper?: boolean;
+        stepBumperSeconds?: number;
+      };
+      const silent = Boolean(body.silent);
+      const job = await createVideoJob(sessionId);
+      res.status(202).json({ ok: true, job });
+
+      void (async () => {
+        await updateVideoJob(job.jobId, { status: 'running', progress: 5 });
+        try {
+          const {
+            buildVideoProjectArtifacts,
+            assembleClipchampPackage,
+            loadVideoRendererConfig,
+            renderTutorialMp4,
+          } = await import('@toolsweb/video-renderer');
+          const loaded = await videoSource.load(sessionId);
+          if (!loaded.ok) {
+            await updateVideoJob(job.jobId, {
+              status: 'failed',
+              progress: 100,
+              error: loaded.errors[0]?.message ?? 'source failed',
+            });
+            return;
+          }
+          await updateVideoJob(job.jobId, { progress: 20 });
+          const config = loadVideoRendererConfig();
+          if (silent) config.ttsProvider = 'silent';
+          if (typeof body.stepBumper === 'boolean') {
+            config.stepBumperEnabled = body.stepBumper;
+          }
+          if (
+            typeof body.stepBumperSeconds === 'number' &&
+            Number.isFinite(body.stepBumperSeconds) &&
+            body.stepBumperSeconds >= 0
+          ) {
+            config.stepBumperSeconds = body.stepBumperSeconds;
+          }
+          const out = path.join(repoRoot, 'exports', 'video', sessionId);
+          const built = await buildVideoProjectArtifacts({
+            source: loaded.source,
+            outputDir: out,
+            config,
+            forceSilent: silent || config.ttsProvider === 'silent',
+          });
+          await updateVideoJob(job.jobId, { progress: 55 });
+          try {
+            const rendered = await renderTutorialMp4({
+              storyboard: built.storyboard,
+              projectRoot: out,
+              config,
+            });
+            await updateVideoJob(job.jobId, { progress: 85 });
+            const pkg = await assembleClipchampPackage(out);
+            await updateVideoJob(job.jobId, {
+              status: 'completed',
+              progress: 100,
+              outputPath: pkg,
+            });
+            void rendered;
+          } catch (e) {
+            const pkg = await assembleClipchampPackage(out);
+            await updateVideoJob(job.jobId, {
+              status: 'failed',
+              progress: 100,
+              outputPath: pkg,
+              error: e instanceof Error ? e.message : String(e),
+            });
+          }
+        } catch (e) {
+          await updateVideoJob(job.jobId, {
+            status: 'failed',
+            progress: 100,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      })();
+    })
+  );
+
+  router.get(
+    '/sessions/:sessionId/video-render/:jobId',
+    asyncHandler(async (req, res) => {
+      const jobId = String(req.params.jobId ?? '');
+      const job = await getVideoJob(jobId);
+      if (!job || job.sessionId !== String(req.params.sessionId ?? '')) {
+        res.status(404).json({ ok: false, error: 'Job not found' });
+        return;
+      }
+      res.json({ ok: true, job });
+    })
+  );
+
+  router.get(
+    '/sessions/:sessionId/video-package',
+    asyncHandler(async (req, res) => {
+      const sessionId = String(req.params.sessionId ?? '');
+      const zipOrDir = path.join(
+        repoRoot,
+        'exports',
+        'video',
+        sessionId,
+        'clipchamp-package',
+        'README-CLIPCHAMP.md'
+      );
+      try {
+        await access(zipOrDir);
+      } catch {
+        res.status(404).json({
+          ok: false,
+          error: 'Paquete no generado. Ejecuta video-render primero.',
+        });
+        return;
+      }
+      res.json({
+        ok: true,
+        packagePath: path.join(repoRoot, 'exports', 'video', sessionId, 'clipchamp-package'),
+        hint: 'Los exports viven en disco local (gitignored). Usa la CLI o abre la carpeta.',
+      });
+    })
+  );
+
+  /** Stream local MP4 for in-UI preview (UC-0009). */
+  router.get(
+    '/sessions/:sessionId/video-preview',
+    asyncHandler(async (req, res) => {
+      const sessionId = String(req.params.sessionId ?? '');
+      const mp4Path = path.join(
+        repoRoot,
+        'exports',
+        'video',
+        sessionId,
+        '05-video',
+        'tutorial-final.mp4'
+      );
+      let fileStat: Awaited<ReturnType<typeof stat>>;
+      try {
+        fileStat = await stat(mp4Path);
+      } catch {
+        res.status(404).json({
+          ok: false,
+          error: 'MP4 no generado. Usa «Generar MP4» primero.',
+        });
+        return;
+      }
+
+      const size = fileStat.size;
+      res.setHeader('Accept-Ranges', 'bytes');
+      res.setHeader('Content-Type', 'video/mp4');
+      res.setHeader('Cache-Control', 'no-store');
+
+      const rangeHeader = req.headers.range;
+      if (rangeHeader) {
+        const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+        if (!match) {
+          res.status(416).setHeader('Content-Range', `bytes */${size}`).end();
+          return;
+        }
+        const start = match[1] ? Number(match[1]) : 0;
+        const end = match[2] ? Number(match[2]) : size - 1;
+        if (
+          !Number.isFinite(start) ||
+          !Number.isFinite(end) ||
+          start < 0 ||
+          end < start ||
+          start >= size
+        ) {
+          res.status(416).setHeader('Content-Range', `bytes */${size}`).end();
+          return;
+        }
+        const safeEnd = Math.min(end, size - 1);
+        res.status(206);
+        res.setHeader('Content-Range', `bytes ${start}-${safeEnd}/${size}`);
+        res.setHeader('Content-Length', safeEnd - start + 1);
+        createReadStream(mp4Path, { start, end: safeEnd }).pipe(res);
+        return;
+      }
+
+      res.setHeader('Content-Length', size);
+      createReadStream(mp4Path).pipe(res);
     })
   );
 

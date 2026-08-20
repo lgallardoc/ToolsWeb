@@ -45,6 +45,12 @@ export function sanitizeTutorialSession(session: TutorialSession): TutorialSessi
       ...(step.placeholder !== undefined
         ? { placeholder: sanitizeTutorialText(step.placeholder) }
         : {}),
+      ...(step.menuModule !== undefined
+        ? { menuModule: sanitizeTutorialText(step.menuModule) }
+        : {}),
+      ...(step.menuModuleIndex !== undefined
+        ? { menuModuleIndex: step.menuModuleIndex }
+        : {}),
       ...(step.avatarScript
         ? {
             avatarScript: {

@@ -1,0 +1,42 @@
+{
+  "name": "@toolsweb/video-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx scripts/assert-video.mts",
+    "video:build": "tsx src/cli.ts build",
+    "video:validate": "tsx src/cli.ts validate",
+    "video:preview": "echo Preview: npx remotion preview src/remotion/entry.ts",
+    "video:render": "tsx src/cli.ts build",
+    "video:scene": "tsx src/cli.ts build"
+  },
+  "dependencies": {
+    "@toolsweb/shared": "*",
+    "@remotion/bundler": "^4.0.286",
+    "@remotion/renderer": "^4.0.286",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.286",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

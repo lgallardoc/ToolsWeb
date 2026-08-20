@@ -10,6 +10,9 @@ coverage/
 packages/backend/data/
 packages/backend/captures/
 packages/backend/exports/
+exports/
+.toolsweb/
+packages/video-renderer/.tmp-fixture/
 *.tsbuildinfo
 
 .cursor/

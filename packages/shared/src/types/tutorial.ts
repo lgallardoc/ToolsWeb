@@ -54,6 +54,16 @@ export const CaptureStepSchema = z.object({
   formContext: z.string().optional(),
   /** Placeholder text for input/textarea targets (UC-0003). */
   placeholder: z.string().optional(),
+  /**
+   * Sticky main-menu module label (UC-0011). Inherited across steps until the next
+   * primary-nav click; does not collapse or delete steps.
+   */
+  menuModule: z.string().optional(),
+  /**
+   * 1-based index of the menu-module group (interstitial “Paso N”).
+   * Distinct from CaptureStep.stepNumber (UC-0011).
+   */
+  menuModuleIndex: z.number().int().positive().optional(),
   /** AI voiceover for this step (UC-0004). */
   avatarScript: AvatarScriptSchema.optional(),
 });

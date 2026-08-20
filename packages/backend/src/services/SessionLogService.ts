@@ -17,8 +17,28 @@ import {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SESSIONS_ROOT = path.resolve(__dirname, '../../data/sessions');
 const CAPTURES_ROOT = path.resolve(__dirname, '../../captures');
+/** Monorepo root (Toolsweb/) — video exports live here. */
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const VIDEO_EXPORTS_ROOT = path.join(REPO_ROOT, 'exports', 'video');
 
 type StoredSession = TutorialSession & { stoppedAt: string };
+
+export type SessionDeleteResult = {
+  /** True if bitácora JSON existed (primary delete target). */
+  deleted: boolean;
+  /** Logical paths removed (best-effort). */
+  removed: string[];
+};
+
+/** Reject path-traversal style session ids (UC-0010). */
+export function assertSafeSessionId(sessionId: string): void {
+  if (!sessionId || sessionId.includes('..') || sessionId.includes('/') || sessionId.includes('\\')) {
+    throw new Error('sessionId inválido');
+  }
+  if (!/^[a-zA-Z0-9._-]+$/.test(sessionId)) {
+    throw new Error('sessionId inválido');
+  }
+}
 
 /** Recover raw TSV paste previously appended into videoPrompt (legacy sessions). */
 function extractProductionGuideFromVideoPrompt(videoPrompt?: string): string | undefined {
@@ -138,19 +158,51 @@ export class SessionLogService {
     }
   }
 
-  async delete(sessionId: string): Promise<boolean> {
-    let existed = false;
-    for (const p of [this.encPath(sessionId), this.legacyPath(sessionId)]) {
+  /**
+   * UC-0010 — purge bitácora + captures + video exports for this session.
+   * Video render jobs are cleaned by the caller via deleteVideoJobsForSession.
+   */
+  async delete(sessionId: string): Promise<SessionDeleteResult> {
+    assertSafeSessionId(sessionId);
+    const removed: string[] = [];
+    let deleted = false;
+
+    for (const [label, p] of [
+      [`data/sessions/${sessionId}.json.enc`, this.encPath(sessionId)],
+      [`data/sessions/${sessionId}.json`, this.legacyPath(sessionId)],
+    ] as const) {
       try {
         await access(p);
-        existed = true;
+        deleted = true;
+        await rm(p, { force: true });
+        removed.push(label);
       } catch {
-        /* */
+        await rm(p, { force: true }).catch(() => undefined);
       }
-      await rm(p, { force: true });
     }
-    await rm(path.join(CAPTURES_ROOT, sessionId), { recursive: true, force: true });
-    return existed;
+
+    const capturesDir = path.join(CAPTURES_ROOT, sessionId);
+    try {
+      await access(capturesDir);
+      await rm(capturesDir, { recursive: true, force: true });
+      removed.push(`captures/${sessionId}`);
+    } catch {
+      await rm(capturesDir, { recursive: true, force: true }).catch(() => undefined);
+    }
+
+    const videoDir = path.join(VIDEO_EXPORTS_ROOT, sessionId);
+    // Never delete the shared _jobs directory even if misnamed.
+    if (sessionId !== '_jobs') {
+      try {
+        await access(videoDir);
+        await rm(videoDir, { recursive: true, force: true });
+        removed.push(`exports/video/${sessionId}`);
+      } catch {
+        await rm(videoDir, { recursive: true, force: true }).catch(() => undefined);
+      }
+    }
+
+    return { deleted: deleted || removed.length > 0, removed };
   }
 
   private async readStored(sessionId: string): Promise<StoredSession | null> {

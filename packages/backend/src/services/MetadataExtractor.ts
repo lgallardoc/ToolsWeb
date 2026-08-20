@@ -195,6 +195,36 @@ function extractElementMetadata(el) {
 }
 `.trim();
 
+/**
+ * Plain JS: primary nav / sidebar click → module label (UC-0011). Not submenus.
+ */
+export const DETECT_PRIMARY_NAV_MODULE_JS = `
+function detectPrimaryNavModule(el) {
+  if (!el || el.nodeType !== 1 || !el.closest) return undefined;
+  var MAX_LEN = 80;
+  function trimText(raw) {
+    if (raw == null) return undefined;
+    var t = String(raw).replace(/\\s+/g, ' ').trim();
+    if (!t) return undefined;
+    return t.length > MAX_LEN ? t.slice(0, MAX_LEN) : t;
+  }
+  // Overflow / listbox / dialog menus are not the primary module rail.
+  if (el.closest('[role="menu"], [role="listbox"], [role="dialog"], [role="alertdialog"]')) {
+    return undefined;
+  }
+  var root = el.closest(
+    'nav, [role="navigation"], aside, [class*="sidebar"], [class*="side-nav"], [class*="sidenav"], [class*="SideNav"], [class*="main-nav"], [class*="main-menu"]'
+  );
+  if (!root) return undefined;
+  var item =
+    el.closest('a, [role="menuitem"], [role="tab"], [role="link"], button, [role="button"]') || el;
+  var text = trimText(item.innerText || item.textContent);
+  if (!text || text.length < 2) return undefined;
+  if (/^(acciones|más|more|menu|options)$/i.test(text)) return undefined;
+  return text;
+}
+`.trim();
+
 export const MetadataExtractor = {
   extractElementMetadata,
   findClosestHeader,

@@ -29,6 +29,7 @@ Cambios quirúrgicos: tocar solo el paquete / app afectado (`shared` | `backend`
 
 ```bash
 npm run build -w @toolsweb/shared
+npm run dev:stack              # API + UI (scripts/dev.sh)
 npm run typecheck --workspace=@toolsweb/backend
 npm run typecheck --workspace=@toolsweb/frontend
 env -u PLAYWRIGHT_BROWSERS_PATH npx playwright install chromium   # si PDF falla
